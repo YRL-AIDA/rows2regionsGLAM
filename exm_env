@@ -1,6 +1,7 @@
-DATASER_PATH='/home/daniil/dataset/PubLayNet/micro_publaynet_1k/pdfs/train'
-COCO_PATH='/home/daniil/dataset/PubLayNet/micro_publaynet_1k/publaynet/train.json'
-
-TEST_PATH='/home/daniil/dataset/PubLayNet/micro_publaynet_1k/pdfs/dev'
-TEST_COCO_PATH='/home/daniil/dataset/PubLayNet/micro_publaynet_1k/publaynet/val.json'
-CASH_PATH='/home/daniil/dataset/PubLayNet/micro_publaynet_1k/tmp/jsons_regions'
+DEVICE='cpu'
+DATASET_PATH='/Users/macbookair/Downloads/micro_publaynet/pdfs/train'
+COCO_PATH='/Users/macbookair/Downloads/micro_publaynet/publaynet/train.json'
+TEST_PATH='/Users/macbookair/Downloads/micro_publaynet/pdfs/dev'
+TEST_COCO_PATH='/Users/macbookair/Downloads/micro_publaynet/publaynet/val.json'
+CASH_PATH='/Users/macbookair/Downloads/micro_publaynet/tmp/jsons_regions_miner'
+CASH_PDF_PATH='/Users/macbookair/Downloads/micro_publaynet/tmp/cache_miner'
