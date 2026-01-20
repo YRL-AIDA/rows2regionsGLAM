@@ -156,6 +156,7 @@ class GLAMDataset(Dataset):
         name_json = os.path.join(self.cache_dir, name_file+'.json')
         with open(name_json, 'w') as f:  
             json.dump(json_res, f, cls=EncodeTensor) 
+        self.cache_names.append(os.path.basename(name_json))
 
     def __str__(self):
         return f"""DATASET INFO:
