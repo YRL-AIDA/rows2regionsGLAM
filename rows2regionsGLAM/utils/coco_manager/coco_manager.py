@@ -55,4 +55,10 @@ class COCOManager:
                 pdf_ann[pdf_name] = {'regions': [get_info(an)]}
 
         self.loger(str(coco['categories']))
-        return pdf_ann
+
+        coco_classes = {}
+        for cat in coco['categories']:
+            coco_classes[cat["id"]] = cat["name"]
+        coco_classes[0] = 'other'
+
+        return pdf_ann, coco_classes
