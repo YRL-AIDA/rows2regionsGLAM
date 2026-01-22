@@ -20,14 +20,14 @@ class GLAMDataset(Dataset):
             self.pdf_dir  = conf["pdf_dir"] 
         else:
             raise Exception('Укажите папку до pdf файлов ("pdf_dir": path)')
-        self.loger("Path Dataset: {self.pdf_dir}")
+        self.loger(f"Path Dataset: {self.pdf_dir}")
 
         if "coco_file" in conf.keys(): 
             self.coco_file  = conf["coco_file"] 
             self.coco_manager = COCOManager({"loger": self.loger, "coco_path": self.coco_file})
         else:
             raise Exception('Укажите папку до COCO-разметки файлов ("coco_file": path)')
-        self.loger("Path COCO: {self.coco_file}")
+        self.loger(f"Path COCO: {self.coco_file}")
 
         if "count_class" in conf.keys(): 
             self.count_class = conf["count_class"] 
