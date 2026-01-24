@@ -161,7 +161,11 @@ class GLAMDataset(Dataset):
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
         if not name_file+'.json' in self.cache_names:
-            data = self.cache_file(name_file)
+            try:
+                data = self.cache_file(name_file)
+            except:
+                # self.loger(f"ERROR file: {name_file}")
+                return {}
         else:
             path = os.path.join(self.cache_dir, name_file+'.json')
 
