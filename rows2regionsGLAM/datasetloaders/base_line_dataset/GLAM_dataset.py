@@ -7,6 +7,15 @@ from ...utils.coco_manager import COCOManager
 from json import JSONEncoder 
 import warnings
 
+def cache_exists(cache_path):
+    """Проверяет, существует ли кэшированный файл."""
+    return os.path.exists(cache_path)
+
+def load_cache(cache_path):
+    """Загружает кэшированные данные."""
+    with open(cache_path, 'r') as f:
+        return json.load(f)
+
 class GLAMDataset(Dataset):
     def __init__(self, conf):
         if "loger" not in conf.keys():
@@ -60,7 +69,7 @@ class GLAMDataset(Dataset):
         self.count = len(pdfs)
         self.pdf_names = [os.path.basename(pdf) for pdf in pdfs]
         self.cache_names = [os.path.basename(js) for js in jsons]
-        self.coco_ann = self.coco_manager.get_regions_from_json()
+        self.coco_ann = self.coco_manager.get_regions_from_json()[0]
 
     def test_cache(self): 
         files  = sorted(os.listdir(self.cache_dir))
@@ -127,14 +136,41 @@ class GLAMDataset(Dataset):
         return torch.tensor([vec_class(c) for c in classes], dtype=torch.float32)
         
         
+    # def __getitem__(self, idx):
+    #     name_file = self.pdf_names[idx]
+    #     if not name_file+'.json' in self.cache_names:
+    #         self.cache_file(name_file)
+    #     path = os.path.join(self.cache_dir, name_file+'.json')
+    #
+    #     with open(path, 'r') as f:
+    #         data = json.load(f)
+    #     if len(data.keys()) == 0:
+    #         return {}
+    #     data['X'] = torch.tensor(data['X'], dtype=torch.float32)
+    #     data['Y'] = torch.tensor(data['Y'], dtype=torch.float32)
+    #     N = data["N"]
+    #     i = data['inds']
+    #     index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
+    #     sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32)
+    #     data['sp_A'] = sp_A
+    #     data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32)
+    #     data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
+    #     data['file_name'] = '.'.join(name_file.split('.')[:-1])
+    #
+    #     return data
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
         if not name_file+'.json' in self.cache_names:
-            self.cache_file(name_file)
-        path = os.path.join(self.cache_dir, name_file+'.json')
-        
-        with open(path, 'r') as f:
-            data = json.load(f)
+            try:
+                data = self.cache_file(name_file)
+            except:
+                # self.loger(f"ERROR file: {name_file}")
+                return {}
+        else:
+            path = os.path.join(self.cache_dir, name_file+'.json')
+
+            with open(path, 'r') as f:
+                data = json.load(f)
         if len(data.keys()) == 0:
             return {}
         data['X'] = torch.tensor(data['X'], dtype=torch.float32)
@@ -147,16 +183,26 @@ class GLAMDataset(Dataset):
         data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32)
         data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
         data['file_name'] = '.'.join(name_file.split('.')[:-1])
-        
         return data
-    
+
+    # def cache_file(self, name_file):
+    #     path_file = os.path.join(self.pdf_dir, name_file)
+    #     json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file])
+    #     name_json = os.path.join(self.cache_dir, name_file+'.json')
+    #     with open(name_json, 'w') as f:
+    #         json.dump(json_res, f, cls=EncodeTensor)
     def cache_file(self, name_file):
+        name_json = os.path.join(self.cache_dir, name_file + '.json')
+
+        if cache_exists(name_json):
+            return load_cache(name_json)
+
         path_file = os.path.join(self.pdf_dir, name_file)
         json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file])
-        name_json = os.path.join(self.cache_dir, name_file+'.json')
-        with open(name_json, 'w') as f:  
-            json.dump(json_res, f, cls=EncodeTensor) 
+        with open(name_json, 'w') as f:
+            json.dump(json_res, f, cls=EncodeTensor)
         self.cache_names.append(os.path.basename(name_json))
+        return json_res
 
     def __str__(self):
         return f"""DATASET INFO:
