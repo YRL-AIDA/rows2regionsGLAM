@@ -30,16 +30,19 @@ class Ploter:
             row.segment.plot()
 
 
-    def plot_tokens(self, tokenizer: BaseTokenizer , torch_dict, markup=False):
-        dict_features= tokenizer.get_dict_vec()   
+    def plot_tokens(self, tokenizer: BaseTokenizer , torch_dict, resize=None, markup=False):
+        dict_features= tokenizer.get_dict_vec()  
+        if resize is None:
+            resize = (1, 1) 
         def get_coords(vec):
+            rw, rh = resize
             x0 = vec[dict_features['x_top_left'][0]]
             x1 = vec[dict_features['x_bottom_right'][0]]
             y0 = vec[dict_features['y_top_left'][0]]
             y1 = vec[dict_features['y_bottom_right'][0]]
             h = vec[dict_features['height'][0]]
             w = vec[dict_features['width'][0]]
-            return x0, x1, w, y0, y1, h
+            return x0*rw, x1*rw, w*rw, y0*rh, y1*rh, h*rh
 
         ax = plt.gca()
         colors_alternative = [
