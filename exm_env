@@ -1,4 +1,6 @@
 DEVICE='cpu'
+NAME_DATASET = "publaynet"
+NAME_TEST_DATASET = "doclaynet"
 DATASET_PATH='/Users/macbookair/Downloads/micro_publaynet/pdfs/train'
 COCO_PATH='/Users/macbookair/Downloads/micro_publaynet/publaynet/train.json'
 TEST_PATH='/Users/macbookair/Downloads/micro_publaynet/pdfs/dev'
