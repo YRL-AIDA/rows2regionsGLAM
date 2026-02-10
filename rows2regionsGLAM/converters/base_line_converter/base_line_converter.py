@@ -1,6 +1,7 @@
 from pager.page_model.sub_models import BaseConverter, RegionModel, RowsModel
 from pager.page_model.sub_models.dtype import ImageSegment, Region, Graph
 from pager import MergeExtractor
+import numpy as np
 
 class Rows2Regions(BaseConverter):
     def __init__(self, conf):
@@ -8,6 +9,7 @@ class Rows2Regions(BaseConverter):
         self.rows2regionsGLAM = conf['model']#
         self.is_merge_extract =  conf['is_merge_extract']
         self.merge_extract = MergeExtractor()
+        self.classes = conf['classes']
 
         
     def convert(self, input_model: RowsModel, output_model: RegionModel):
@@ -49,6 +51,6 @@ class Rows2Regions(BaseConverter):
         for reg in graph_.get_related_graphs():
             indexes = [node.index-1 for node in reg.get_nodes()]
             row_classes  = np.array([node_classes[i].detach().numpy() for i in indexes])
-            lable = CLASSES[np.argmax(row_classes.mean(axis=0))]
+            lable = self.classes[np.argmax(row_classes.mean(axis=0))]
             regions.append({'rows': [rows_json[i] for i in indexes], 'label': lable})
         return regions
