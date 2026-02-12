@@ -1,3 +1,4 @@
+from typing import List
 import torch
 from torch.nn import Linear, BCELoss, BCEWithLogitsLoss, CrossEntropyLoss, GELU, HuberLoss,ModuleList
 from torch.nn.functional import relu
@@ -91,9 +92,9 @@ class EdgeGLAM(torch.nn.Module):
             h = torch.sigmoid(h)
         return torch.squeeze(h, 1)
 
-class CustomLoss(torch.nn.Module):
+class CustomLossBase(torch.nn.Module):
     def __init__(self, params):
-        super(CustomLoss, self).__init__()
+        super(CustomLossBase, self).__init__()
                     #BCEWithLogitsLoss
         self.bce = BCEWithLogitsLoss(pos_weight=torch.tensor(params['edge_imbalance']))
         self.ce = CrossEntropyLoss(weight=torch.tensor(params['publaynet_imbalance']))
@@ -109,20 +110,20 @@ class CustomLoss(torch.nn.Module):
         # Узлы
         n_pred = pred_dict["node_classes"]
         n_true = dict_graph["true_nodes"]
-        loss_node = self.ce(n_pred, n_true) 
-        
+        loss_node = self.ce(n_pred, n_true)
+
         # Строковая регуляризация
         # ang = dict_graph['Y'][:, 0]
         # sig_pred = torch.sigmoid(e_pred)
-        # ang_loss = torch.dot(1-ang, 1-sig_pred)/ang.shape[0] 
+        # ang_loss = torch.dot(1-ang, 1-sig_pred)/ang.shape[0]
 
         loss = self.edge_coef*loss_edge  +self.node_coef*loss_node # + 0.5*ang_loss
         return loss
 
-class TorchModel(torch.nn.Module):
+class TorchModelBase(torch.nn.Module):
     
     def __init__(self, params):
-        super(TorchModel, self).__init__()
+        super(TorchModelBase, self).__init__()
         self.node_emb = NodeGLAM(params)
         self.bin_edge_emb = EdgeGLAM(params)
 

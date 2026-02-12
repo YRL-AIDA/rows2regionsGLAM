@@ -1,4 +1,5 @@
 DEVICE='cpu'
+ROW_GLAM_TYPE = "custom"
 NAME_DATASET = "publaynet"
 NAME_TEST_DATASET = "doclaynet"
 DATASET_PATH='/Users/macbookair/Downloads/micro_publaynet/pdfs/train'

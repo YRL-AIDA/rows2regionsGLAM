@@ -3,7 +3,8 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
-from ...models.rowGLAM import CustomLoss, TorchModel
+from ...models.rowGLAM_base import CustomLossBase, TorchModelBase
+from ...models.rowGLAM_custom import CustomLoss, TorchModel
 from dotenv import load_dotenv
 env_file = os.path.join('..', '.env')
 load_dotenv(env_file)
@@ -25,6 +26,7 @@ class Trainer:
         self.loger.time_log()
         self.loger("Create Trainer")
         self.device = torch.device(os.environ.get('DEVICE', 'cpu'))
+        self.rowGlam_type = os.environ.get('ROW_GLAM_TYPE', 'base')
 
     def _validation(self, model, batch, criterion):     
         return self._step(model, batch, optimizer=None, criterion=criterion, train=False)
@@ -74,7 +76,10 @@ class Trainer:
         list(model.parameters()),
         lr=self.params["learning_rate"],
         )
-        criterion = CustomLoss(self.params["loss_params"]) 
+        if self.rowGlam_type == "base":
+            criterion = CustomLossBase(self.params["loss_params"])
+        else:
+            criterion = CustomLoss(self.params["loss_params"])
 
         model.to(self.device)
         criterion.to(self.device)
@@ -143,7 +148,10 @@ class Trainer:
         except:
             print(dataset)
         self.params['sigmoidEdge'] = False
-        model:torch.nn.Module = TorchModel(self.params)
+        if self.rowGlam_type == "base":
+            model:torch.nn.Module = TorchModelBase(self.params)
+        else:
+            model: torch.nn.Module = TorchModel(self.params)
         if is_restart:
             restart_num = self._load_checkpoint(model, self.model_name)
         
