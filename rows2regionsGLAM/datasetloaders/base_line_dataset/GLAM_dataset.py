@@ -43,6 +43,11 @@ class GLAMDataset(Dataset):
         else:
             raise Exception('Укажите число классов в наборе ("count_class": int)')
 
+        if "name_dataset" in conf.keys():
+            self.name_dataset = conf["name_dataset"]
+        else:
+            raise Exception('Укажите название набора данных ("name_dataset" : str)')
+
         if "default_index" in conf.keys(): 
             self.default_index = conf["default_index"] 
         else:
@@ -134,30 +139,7 @@ class GLAMDataset(Dataset):
                 base_vec[c] = 1
             return base_vec
         return torch.tensor([vec_class(c) for c in classes], dtype=torch.float32)
-        
-        
-    # def __getitem__(self, idx):
-    #     name_file = self.pdf_names[idx]
-    #     if not name_file+'.json' in self.cache_names:
-    #         self.cache_file(name_file)
-    #     path = os.path.join(self.cache_dir, name_file+'.json')
-    #
-    #     with open(path, 'r') as f:
-    #         data = json.load(f)
-    #     if len(data.keys()) == 0:
-    #         return {}
-    #     data['X'] = torch.tensor(data['X'], dtype=torch.float32)
-    #     data['Y'] = torch.tensor(data['Y'], dtype=torch.float32)
-    #     N = data["N"]
-    #     i = data['inds']
-    #     index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
-    #     sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32)
-    #     data['sp_A'] = sp_A
-    #     data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32)
-    #     data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
-    #     data['file_name'] = '.'.join(name_file.split('.')[:-1])
-    #
-    #     return data
+
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
         if not name_file+'.json' in self.cache_names:
@@ -185,12 +167,6 @@ class GLAMDataset(Dataset):
         data['file_name'] = '.'.join(name_file.split('.')[:-1])
         return data
 
-    # def cache_file(self, name_file):
-    #     path_file = os.path.join(self.pdf_dir, name_file)
-    #     json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file])
-    #     name_json = os.path.join(self.cache_dir, name_file+'.json')
-    #     with open(name_json, 'w') as f:
-    #         json.dump(json_res, f, cls=EncodeTensor)
     def cache_file(self, name_file):
         name_json = os.path.join(self.cache_dir, name_file + '.json')
 
@@ -198,27 +174,27 @@ class GLAMDataset(Dataset):
             return load_cache(name_json)
 
         path_file = os.path.join(self.pdf_dir, name_file)
-        json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file])
+        json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file], self.name_dataset)
         with open(name_json, 'w') as f:
             json.dump(json_res, f, cls=EncodeTensor)
         self.cache_names.append(os.path.basename(name_json))
         return json_res
 
     def __str__(self):
-        return f"""DATASET INFO:
-count row: {len(self)}
-first: {self[0].keys()}
-\t A:{np.shape(self[0]["sp_A"])}
-\t nodes_feature:{np.shape(self[0]["X"])}
-\t edges_feature:{np.shape(self[0]["Y"])}
-\t true_edges:{np.shape(self[0]["true_edges"])}
-end:{self[-1].keys()}
-\t A:{np.shape(self[-1]["sp_A"])}
-\t nodes_feature:{np.shape(self[-1]["X"])}
-\t edges_feature:{np.shape(self[-1]["Y"])}
-\t true_edges:{np.shape(self[-1]["true_edges"])}
-
-"""
+        return f"""
+            DATASET INFO:
+            count row: {len(self)}
+            first: {self[0].keys()}
+            \t A:{np.shape(self[0]["sp_A"])}
+            \t nodes_feature:{np.shape(self[0]["X"])}
+            \t edges_feature:{np.shape(self[0]["Y"])}
+            \t true_edges:{np.shape(self[0]["true_edges"])}
+            end:{self[-1].keys()}
+            \t A:{np.shape(self[-1]["sp_A"])}
+            \t nodes_feature:{np.shape(self[-1]["X"])}
+            \t edges_feature:{np.shape(self[-1]["Y"])}
+            \t true_edges:{np.shape(self[-1]["true_edges"])}
+        """
     
 
 

@@ -12,9 +12,9 @@ class Rows2Regions(BaseConverter):
         self.classes = conf['classes']
 
         
-    def convert(self, input_model: RowsModel, output_model: RegionModel):
+    def convert(self, input_model: RowsModel, output_model: RegionModel, pdf_img):
         page_json = input_model.to_dict()
-        region_list = self.get_region(page_json['rows'])
+        region_list = self.get_region(page_json['rows'], pdf_img)
         output_model.from_dict({"regions": region_list})
 
         if self.is_merge_extract:
@@ -23,8 +23,8 @@ class Rows2Regions(BaseConverter):
         # sorter = RegionSorterCutXYExtractor()
         # sorter.extract(output_model)
 
-    def get_region(self, rows_json):
-        graph_dict_torch = self.rows2regionsGLAM_tokenizer(rows_json)
+    def get_region(self, rows_json, pdf_img):
+        graph_dict_torch = self.rows2regionsGLAM_tokenizer(rows_json, pdf_img)
         result = self.rows2regionsGLAM(graph_dict_torch)
         result['deleted_edges'] = result['E_pred'] < 0.5
         

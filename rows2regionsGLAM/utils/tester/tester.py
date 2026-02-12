@@ -1,7 +1,10 @@
 import sys
 import os
+import torch
 import numpy as np
 from pager import ImageSegment
+from rows2regionsGLAM.metrics import GridMetric
+from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 DOC2PUB_MAP = {
     'Text': 'text',
@@ -96,7 +99,7 @@ class Tester:
             true_regions = test_dataset.coco_ann[name_file]['regions']
             bboxes_true = self.clean_bboxes_true([reg['segment'] for reg in true_regions])
             
-            pdf_json = self.pdf_manager.get_json_from_pdf(os.path.join(test_path, name_file))
+            pdf_json, pdf_img = self.pdf_manager.get_json_and_img_from_pdf(os.path.join(test_path, name_file))
             w, h = pdf_json['width'],pdf_json['height']
             if name_test_dataset == "doclaynet":
                 resize = (w/1024, h/1024)
@@ -107,17 +110,17 @@ class Tester:
             
             self.rows_model.from_dict({"rows": row_json})
             try:
-                self.rows2regions.convert(self.rows_model, self.region_model)
+                self.rows2regions.convert(self.rows_model, self.region_model, pdf_img)
                 pred_regions = self.region_model.to_dict()['regions']
-                
+
                 if name_dataset == "doclaynet" and name_test_dataset == "publaynet":
                     for r in pred_regions:
                         pub_label = DOC2PUB_MAP.get(r['label'], 'other')
                         r['label'] = pub_label
                     # pred_regions = aggregate_list_items(pred_regions)
-                    
+
                 bboxes_pred = [r['segment'] for r in pred_regions if r['label'] != 'other']
-                
+
                 word_grids.append([self.get_bbox(word['segment']) for row in row_json for word in row['words']])
                 row_grids.append([self.get_bbox(row['segment']) for row in row_json])
                 target.append([self.get_bbox(seg, resize) for seg in bboxes_true])
@@ -128,4 +131,54 @@ class Tester:
             
             print(f"{(i+1)/N*100:4.2f} %", end='\r')
 
-        return target, preds, word_grids, row_grids
+        return [target, preds, word_grids, row_grids]
+
+    def calculate_grid_metric(self,  target, preds, word_grids, row_grids):
+        grid_metric = GridMetric()
+
+        i = 0
+        N = len(preds)
+        for bboxes_pred, bboxes_true, grid_row, grid_word in zip(preds, target, row_grids, word_grids):
+            i += 1
+            try:
+                grid_metric.add_pair(bboxes_pred, bboxes_true, grid_row, grid_word)
+                print(f"{(i) / N * 100:4.2f} %", end='\r')
+            except:
+                pass
+        grid_metric.update()
+
+        return grid_metric
+
+    def calculate_map_metric(self, preds, target):
+        map_metric = MeanAveragePrecision(box_format="xywh")
+
+        get_category = lambda an: 1
+
+        map_metric.update([dict(
+            boxes=torch.tensor(bboxes_pred),
+            scores=torch.tensor([1.0 for an in bboxes_pred]),
+            labels=torch.tensor([get_category(an) for an in bboxes_pred]),
+        ) for bboxes_pred in preds],
+            [dict(
+                boxes=torch.tensor(bboxes_true),
+                labels=torch.tensor([get_category(an) for an in bboxes_true]),
+            ) for bboxes_true in target])
+        rez = map_metric.compute()
+        map_metric_rez = f"mAP@IoU[0.50:0.95]   :{rez['map']:.8f}"
+
+        return map_metric_rez
+
+    def print_result(self, metrics):
+        target = metrics[0]
+        preds = metrics[1]
+        word_grids = metrics[2]
+        row_grids = metrics[3]
+
+        map_metric_rez = self.calculate_map_metric(preds, target)
+        grid_metric = self.calculate_grid_metric(target, preds, word_grids, row_grids)
+
+        print(map_metric_rez)
+        print(grid_metric)
+        self.loger("Test Result")
+        self.loger(map_metric_rez)
+        self.loger(grid_metric.__str__())
