@@ -5,15 +5,16 @@ from pager.page_model.sub_models.dtype import ImageSegment
 import torch
 import re
 import numpy as np
+import base64
 
 class RowGLAMTokenizer(BaseTokenizer):
     def get_name(self):
         return "RowGLAM"
     
-    def __call__(self, rows_json):
+    def __call__(self, rows_json, pdf_img):
         A = self.get_A(rows_json)
-        node_features = self.get_node_features(rows_json)
-        edge_features = self.get_edge_features(A, rows_json)
+        node_features = self.get_node_features(rows_json, pdf_img)
+        edge_features = self.get_edge_features(A, rows_json, pdf_img)
         json_info =  {
             'A': A,
             'node_features': node_features,
@@ -35,7 +36,7 @@ class RowGLAMTokenizer(BaseTokenizer):
     
         return [A1_, A2_]
     
-    def get_node_features(self, rows_json):
+    def get_node_features(self, rows_json, pdf_img):
         if len(rows_json) == 0:
             return [[]]
         rows_texts = [r['text'] for r in rows_json]
@@ -63,7 +64,7 @@ class RowGLAMTokenizer(BaseTokenizer):
             "heuristics_vec": [13, 14]
         }
 
-    def get_edge_features(self, A, rows_json):
+    def get_edge_features(self, A, rows_json, pdf_img):
         edges_featch = []
         for i, j in zip(A[0], A[1]):
             r1 = ImageSegment(dict_2p= rows_json[i]['segment'])
