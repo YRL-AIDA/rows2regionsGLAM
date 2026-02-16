@@ -1,5 +1,5 @@
 DEVICE='cpu'
-
+ROW_GLAM_TYPE = "custom"
 DOCLAYNET_TRAIN_PDF_PATH = 'E:/DocLayNet_core_10k/PDF'
 DOCLAYNET_COCO_PATH = 'E:/DocLayNet_core_10k/train.json'
 DOCLAYNET_TEST_PDF_PATH = 'E:/DocLayNet/PDF'
