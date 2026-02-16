@@ -98,8 +98,11 @@ class Trainer:
                 print(f"Batch # {l+1} loss={my_loss_list[-1]:.4f}" + " "*40, end='\r')
                 if (k == start_epoch and l==0):
                     print(f"Время обучения batch'а {time.time()-start:.2f} сек")
+            my_loss_list_np = np.array(my_loss_list, dtype=np.float64)
             train_val = np.mean(my_loss_list)
             loss_list.append(train_val)
+            if np.isnan(train_val):
+                train_val = my_loss_list_np[np.isfinite(my_loss_list_np)].mean()
 
             my_loss_list = []
             for l, batch_indexs in enumerate(val_dataset):
@@ -107,7 +110,10 @@ class Trainer:
                 batch_loss = self._validation(model, batch, criterion)
                 my_loss_list.append(batch_loss)
                 print(f"Batch # {l+1} loss={my_loss_list[-1]:.4f}" + " "*40, end='\r')
+            my_loss_list_np = np.array(my_loss_list, dtype=np.float64)
             validation_val =  np.mean(my_loss_list)
+            if np.isnan(validation_val):
+                validation_val = my_loss_list_np[np.isfinite(my_loss_list_np)].mean()
             print("="*10, f"EPOCH #{k+1}","="*10, f"({train_val:.4f}/{validation_val:.4f})")
             if k == start_epoch:
                 print(f"Время обучения epoch {time.time()-start:.2f} сек")    
