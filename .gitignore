@@ -216,3 +216,5 @@ row2region_GLAM_tmp*
 notebooks/* 
 !notebooks/*.ipynb
 
+experiments/*
+!experiments/**/*.ipynb

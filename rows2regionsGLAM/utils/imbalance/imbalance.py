@@ -1,4 +1,6 @@
 import numpy as np
+from ..dict_device_to_cpu import  get_dict_to_cpu
+
 
 def _calculate_positiv_negativ(dataset):
     positiv = []
@@ -6,7 +8,8 @@ def _calculate_positiv_negativ(dataset):
     positiv_nodes = []
     negativ_nodes = []
     k = 0
-    for g in dataset:
+    for gi in dataset:
+        g = get_dict_to_cpu(gi)
         if not "true_edges" in g or not "true_nodes" in g:
             continue
         M = len(g['true_edges'])
