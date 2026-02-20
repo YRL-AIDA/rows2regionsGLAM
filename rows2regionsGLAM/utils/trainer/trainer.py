@@ -6,6 +6,7 @@ import torch.nn as nn
 from ...models.rowGLAM_base import CustomLossBase, TorchModelBase
 from ...models.rowGLAM_custom import CustomLoss, TorchModel
 from dotenv import load_dotenv
+from ..dict_device_to_cpu import  move_to_device
 env_file = os.path.join('..', '.env')
 load_dotenv(env_file)
 
@@ -54,8 +55,9 @@ class Trainer:
             try:
                 if data_graph_dict is None:
                     continue
-                pred_graph_dict = model(data_graph_dict)
-                loss = criterion(pred_graph_dict, data_graph_dict)
+                g = move_to_device(data_graph_dict, self.device)
+                pred_graph_dict = model(g)
+                loss = criterion(pred_graph_dict, g)
                 my_loss_list.append(loss.item())
                 print(f"{(j+1)/len(batch)*100:.2f} % Batch loss={my_loss_list[-1]:.4f}" + " "*40, end="\r")
             except Exception as e:
@@ -87,12 +89,15 @@ class Trainer:
         loss_list = []
         start = time.time()
         train_dataset, val_dataset = self._split_index_train_val(dataset, val_split=0.1, batch_size=self.params["batch_size"])
+        batches = []
+        for l, batch_indexs in enumerate(train_dataset):
+            batches.append([dataset[ind] for ind in batch_indexs])
         for k in range(start_epoch, self.params["epochs"]):
             my_loss_list = []
             if k == start_epoch:
                 start = time.time()
-            for l, batch_indexs in enumerate(train_dataset):
-                batch = [dataset[ind] for ind in batch_indexs]
+            for l, batch in enumerate(batches):
+                
                 batch_loss = self._step(model, batch, optimizer, criterion)
                 my_loss_list.append(batch_loss)
                 print(f"Batch # {l+1} loss={my_loss_list[-1]:.4f}" + " "*40, end='\r')

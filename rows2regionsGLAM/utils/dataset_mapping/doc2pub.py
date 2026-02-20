@@ -168,11 +168,11 @@ def transform_annotations(data, y_threshold=50, x_tolerance=0.1):
     return data
 
 
-with open('E:/Work/DocLayNet/train (old).json', 'r', encoding='utf-8') as f:
+with open('/home/dataset/DocLayNet/DocLayNet_core_1k_test/train.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 
 transformed_data = transform_annotations(data, y_threshold=50, x_tolerance=0.1)
 
-with open('E:/Work/DocLayNet/train.json', 'w', encoding='utf-8') as f:
+with open('/home/dataset/DocLayNet/DocLayNet_core_1k_test/train (new).json', 'w', encoding='utf-8') as f:
     json.dump(transformed_data, f, ensure_ascii=False, indent=4)
 

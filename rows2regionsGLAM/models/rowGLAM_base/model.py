@@ -118,6 +118,9 @@ class CustomLossBase(torch.nn.Module):
         # ang_loss = torch.dot(1-ang, 1-sig_pred)/ang.shape[0]
 
         loss = self.edge_coef*loss_edge  +self.node_coef*loss_node # + 0.5*ang_loss
+        # print(f"Потери узлов: {loss_node}; Потери ребер: {loss_edge}")
+        # print(f"Потери узлов * коэф: {self.node_coef*loss_node}; Потери ребер * коэф: {self.edge_coef*loss_edge}")
+        # print(loss)
         return loss
 
 class TorchModelBase(torch.nn.Module):

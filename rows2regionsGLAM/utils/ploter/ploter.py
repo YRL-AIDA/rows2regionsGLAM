@@ -3,6 +3,7 @@ from pager.page_model.sub_models.dtype import Row, ImageSegment
 from ...tokenizers import BaseTokenizer
 import numpy as np
 import matplotlib.pyplot as plt
+from ..dict_device_to_cpu import  get_dict_to_cpu
 class Ploter:
     def __init__(self, conf):
         if "loger" not in conf.keys():
@@ -30,8 +31,9 @@ class Ploter:
             row.segment.plot()
 
 
-    def plot_tokens(self, tokenizer: BaseTokenizer , torch_dict, resize=None, markup=False):
-        dict_features= tokenizer.get_dict_vec()  
+    def plot_tokens(self, tokenizer: BaseTokenizer , torch_dict_device, resize=None, markup=False):
+        dict_features= tokenizer.get_dict_vec() 
+        torch_dict = get_dict_to_cpu(torch_dict_device)
         if resize is None:
             resize = (1, 1) 
         def get_coords(vec):

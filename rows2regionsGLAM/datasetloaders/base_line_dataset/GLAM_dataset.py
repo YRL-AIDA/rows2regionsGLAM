@@ -6,6 +6,7 @@ import os
 from ...utils.coco_manager import COCOManager
 from json import JSONEncoder 
 import warnings
+from collections import defaultdict
 
 def cache_exists(cache_path):
     """Проверяет, существует ли кэшированный файл."""
@@ -68,6 +69,13 @@ class GLAMDataset(Dataset):
         else:
             raise Exception('Напишите функцию перевода pdf в torch_dict ("pdf2torch_dict": pdf2torch_dict(path_pdf, coco_dict_file) )')
 
+        if "to_ROM" in conf.keys():
+            self.to_ROM = conf["to_ROM"]
+        else:
+            raise Exception('Укажите сохранять ли датасет в оперативной памяти ("to_ROM": bool)')
+
+        self.device = torch.device(conf['device'] if 'device' in conf else 'cpu')
+
         pdfs = [f for f in os.listdir(self.pdf_dir) if f.split('.')[-1] == 'pdf' and not os.path.isdir(f)]
         jsons = [f for f in os.listdir(self.cache_dir)]
         pdfs.sort()
@@ -75,6 +83,10 @@ class GLAMDataset(Dataset):
         self.pdf_names = [os.path.basename(pdf) for pdf in pdfs]
         self.cache_names = [os.path.basename(js) for js in jsons]
         self.coco_ann = self.coco_manager.get_regions_from_json()[0]
+
+        if self.to_ROM:
+            self.memory = dict()
+            self.load_to_memory()
 
     def test_cache(self): 
         files  = sorted(os.listdir(self.cache_dir))
@@ -125,6 +137,41 @@ class GLAMDataset(Dataset):
         self.files = files
         self.count = len(self.files)
 
+    def load_to_memory(self):
+        for i, name_file in enumerate(self.pdf_names):
+            if not name_file+'.json' in self.cache_names:
+                try:
+                    data = self.cache_file(name_file)
+                except:
+                    # self.loger(f"ERROR file: {name_file}")
+                    return {}
+            else:
+                path = os.path.join(self.cache_dir, name_file+'.json')
+
+                with open(path, 'r') as f:
+                    data = json.load(f)
+
+            self.memory[i] = self.get_torch_data(data)
+
+
+    def get_torch_data(self, data_input):
+        data = {}
+        if len(data_input.keys()) == 0:
+            return {}
+        data['X'] = torch.tensor(data_input['X'], dtype=torch.float32).to(self.device)
+        data['Y'] = torch.tensor(data_input['Y'], dtype=torch.float32).to(self.device)
+        N = data_input["N"]
+        i = data_input['inds']
+        data["N"] = N
+        data['inds'] = i
+        index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
+        sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32).to(self.device)
+        data['sp_A'] = sp_A
+        data['true_edges'] = torch.tensor([0 if i is None else i for i in data_input['true_edges']], dtype=torch.float32).to(self.device)
+        data['true_nodes'] = self.__class_to_vec(data_input['true_nodes']).to(self.device)
+        # data['file_name'] = data_input['file_name']  #TODO: Вернуть после эксп
+        return data
+        
 
     def __len__(self):
         return self.count
@@ -141,7 +188,15 @@ class GLAMDataset(Dataset):
         return torch.tensor([vec_class(c) for c in classes], dtype=torch.float32)
 
     def __getitem__(self, idx):
+        if idx >= self.count:
+            raise IndexError()  
         name_file = self.pdf_names[idx]
+        if self.to_ROM:    
+            data = self.memory[idx] if idx >= 0 else self.memory[self.count+idx]
+            data['file_name'] = '.'.join(name_file.split('.')[:-1])  #TODO: Убрать после эксп
+            return data
+
+
         if not name_file+'.json' in self.cache_names:
             try:
                 data = self.cache_file(name_file)
@@ -153,19 +208,8 @@ class GLAMDataset(Dataset):
 
             with open(path, 'r') as f:
                 data = json.load(f)
-        if len(data.keys()) == 0:
-            return {}
-        data['X'] = torch.tensor(data['X'], dtype=torch.float32)
-        data['Y'] = torch.tensor(data['Y'], dtype=torch.float32)
-        N = data["N"]
-        i = data['inds']
-        index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
-        sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32)
-        data['sp_A'] = sp_A
-        data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32)
-        data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
-        data['file_name'] = '.'.join(name_file.split('.')[:-1])
-        return data
+        data['file_name'] ='.'.join(name_file.split('.')[:-1]) #TODO: Убрать после эксп
+        return self.get_torch_data(data) 
 
     def cache_file(self, name_file):
         name_json = os.path.join(self.cache_dir, name_file + '.json')
@@ -175,6 +219,7 @@ class GLAMDataset(Dataset):
 
         path_file = os.path.join(self.pdf_dir, name_file)
         json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file], self.name_dataset)
+        json_res['file_name'] = name_file 
         with open(name_json, 'w') as f:
             json.dump(json_res, f, cls=EncodeTensor)
         self.cache_names.append(os.path.basename(name_json))
