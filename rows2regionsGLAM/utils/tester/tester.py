@@ -182,3 +182,14 @@ class Tester:
         self.loger("Test Result")
         self.loger(map_metric_rez)
         self.loger(grid_metric.__str__())
+
+    def get_results(self, metrics):
+        target = metrics[0]
+        preds = metrics[1]
+        word_grids = metrics[2]
+        row_grids = metrics[3]
+
+        map_metric_rez = self.calculate_map_metric(preds, target)
+        grid_metric = self.calculate_grid_metric(target, preds, word_grids, row_grids)
+
+        return map_metric_rez, grid_metric.rez

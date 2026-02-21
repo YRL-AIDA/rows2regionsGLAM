@@ -71,8 +71,8 @@ class TorchModel(torch.nn.Module):
                 Edge_pred_logits = self.mlp_edge_class(Omega)
             case 2:
                 Node_classes = self.mlp_node_class(x)
-                if not (self.mlp_node_post is None):
-                    x = self.mlp_node_post(x)
+                if not (self.mlp_node_pred is None):
+                    x = self.mlp_node_pred(x)
                 x = self.forward_gnn(x, sp_A, self.gcn_node_post)
                 x = self.mlp_node_edge(x)
                 Omega = torch.cat([x[inds[0]], x[inds[1]], X[inds[0]], X[inds[1]], Y], dim=1)
@@ -124,8 +124,8 @@ class TorchModel(torch.nn.Module):
 
                 self.gcn_node, dim = self.build_gcn_layer(self.params["gcn_node"], dim)
                 self.mlp_node_class, _ = self.build_mlp_layer(self.params["mlp_node_class"], dim)
-                self.mlp_node_post, dim = (None, dim) if self.params["mlp_node_post"] is None else self.build_mlp_layer(
-                    self.params["mlp_node_post"], dim)
+                self.mlp_node_pred, dim = (None, dim) if self.params["mlp_node_pred"] is None else self.build_mlp_layer(
+                    self.params["mlp_node_pred"], dim)
                 self.gcn_node_post, dim = self.build_gcn_layer(self.params["gcn_node_post"], dim)
                 self.mlp_node_edge, dim = self.build_mlp_layer(self.params["mlp_node_edge"], dim)
                 dim = self.params["node_featch"] * 2 + self.params["edge_featch"] + dim * 2
