@@ -1,4 +1,5 @@
 from pager.page_model.sub_models.dtype import ImageSegment
+import numpy as np
 
 class Cacher:
     def __init__(self, conf):
@@ -20,14 +21,48 @@ class Cacher:
             self.tokenizer = conf['tokenizer']
         self.loger.time_log()
         self.loger("Create Cacher")
+
     def _get_true_edges(self, token, rows, region_segs, region_categories):
-        def is_one_region(row_seg_1, row_seg_2, region_segs):
-            for i, reg in enumerate(region_segs):
-                if reg.is_intersection(row_seg_1):
-                    if reg.is_intersection(row_seg_2):
-                        return 1
+            
+        def how_much_intersection(reg, row):
+            if not reg.is_intersection(row):
+                return 0.0
+            xs = [row.x_top_left, row.x_bottom_right, reg.x_top_left, reg.x_bottom_right]
+            W = list(set(xs))
+            W.sort()
+
+            ys = [row.y_top_left, row.y_bottom_right, reg.y_top_left, reg.y_bottom_right]
+            H = list(set(ys))
+            H.sort()
+
+            def get_border(set_list, origin_list):
+                if len(set_list) == 4:
+                    return set_list[1], set_list[2]
+                if len(set_list) == 2:
+                    return set_list[0], set_list[1]
+                if len(set_list) == 3:
+                    if origin_list[0] == origin_list[2]:
+                        return set_list[0], set_list[1]
                     else:
-                        return 0
+                        return set_list[1], set_list[2]
+                
+            ix0, ix1 = get_border(W, xs)
+            iy0, iy1 = get_border(H, ys)
+            size_in = (ix1-ix0)*(iy1-iy0)
+            size_row = row.height*row.width
+            return size_in/size_row
+
+
+
+
+
+        def is_one_region(num_reg1, num_reg2):
+            if num_reg1 == None:
+                return 0
+            if num_reg2 == None:
+                return 0
+            if num_reg1 == num_reg2:
+                return 1
             return 0
 
         def get_category(seg, region_segs, region_categories):
@@ -47,7 +82,14 @@ class Cacher:
 
         row_segments = [get_mini_seg(row['segment']) for row in rows]
         A = token['inds']
-        true_edges = [is_one_region(row_segments[i], row_segments[j], region_segs) for i, j in zip(A[0], A[1])]
+        nums_regions = []
+        for row in row_segments:
+            reg_ = [how_much_intersection(reg, row) for reg in region_segs]
+            if max(reg_) == 0:
+                nums_regions.append(None)
+            else:
+                nums_regions.append(np.argmax(reg_))
+        true_edges = [is_one_region(nums_regions[i], nums_regions[j]) for i, j in zip(A[0], A[1])]
         true_nodes = [get_category(row_seg, region_segs, region_categories) for row_seg in row_segments]
         return true_edges, true_nodes
 
