@@ -1,7 +1,9 @@
 from pager import ImageSegment
 import numpy as np
-
+from ..utils.intersect_util import get_num_regions_of_rows
 def gridIoU(bbox_1:ImageSegment, bbox_2:ImageSegment, grid_blocks:list[ImageSegment]):
+    
+    # Строки из соседних блоков могут задевать и попадать в true, но в predict не попадают
     out_1, out_2, in_12 = 0, 0, 0
     for el in grid_blocks:
         in_1 = el.is_intersection(bbox_1)
@@ -19,15 +21,22 @@ def gridIoU(bbox_1:ImageSegment, bbox_2:ImageSegment, grid_blocks:list[ImageSegm
         
 
 def grid_Precision_and_Recall(bboxes_pred:list[ImageSegment], bboxes_true:list[ImageSegment], grid_blocks:list[ImageSegment], threshold=0.5):
-    def get_iou(bp, bt, grid_blocks):
-        try:
-            return gridIoU(bp, bt, grid_blocks)
-        except:
-            return 0.0
+    intersect_matrix_true = get_num_regions_of_rows(bboxes_true, grid_blocks)
+    intersect_matrix_pred = get_num_regions_of_rows(bboxes_pred, grid_blocks)
+    def get_iou(it, ip):
+        in_ip = intersect_matrix_pred == ip
+        in_it = intersect_matrix_true == it
+
+        dem =(in_ip | in_it).sum()
+        num = (in_ip & in_it).sum()
+        
+        return 0.0 if dem == 0 else float(num/dem)
+        
     mtrx = np.array([
-        [get_iou(bp, bt, grid_blocks) for bt in bboxes_true] for bp in bboxes_pred 
+        [get_iou(it, ip) for it, _ in enumerate(bboxes_true)] 
+        for ip, _ in enumerate(bboxes_pred)
     ])
-    TP = int(sum(mtrx.max(axis=0)>threshold))
+    TP = int(sum(mtrx.max(axis=0)>threshold))        
     TP_pl_FP = len(bboxes_pred) 
     TP_pl_TN = len(bboxes_true)
     precision = TP/TP_pl_FP 
