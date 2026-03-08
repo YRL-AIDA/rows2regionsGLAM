@@ -82,7 +82,8 @@ class Tester:
         for i, row in enumerate(segs_row):
             if is_row_in_region(row, seg_bboxes_true):
                 new_rows.append(old_rows[i])
-        rows = new_rows
+        rows.clear()
+        rows.extend(new_rows)
 
     def clean_bboxes_true(self, bboxes_true):
         return [bbox_true for bbox_true in bboxes_true if bbox_true['height'] > 3 and bbox_true['width'] > 3]
@@ -105,8 +106,7 @@ class Tester:
                 resize = (w/1024, h/1024)
             else:
                 resize = (1, 1)
-            row_json = self.row_manager.get_row_json_from_pdf_json(pdf_json)
-            self.clean_rows(row_json, bboxes_true)
+            row_json = self.row_manager.get_row_json_from_pdf_json(pdf_json)   
             
             self.rows_model.from_dict({"rows": row_json})
             try:
@@ -120,7 +120,9 @@ class Tester:
                     # pred_regions = aggregate_list_items(pred_regions)
 
                 bboxes_pred = [r['segment'] for r in pred_regions if r['label'] != 'other']
-
+                
+                # Очистка строк только для тестирования, в момент работы модели используются все строки, поскольку она училась на всех.
+                self.clean_rows(row_json, bboxes_true)
                 word_grids.append([self.get_bbox(word['segment']) for row in row_json for word in row['words']])
                 row_grids.append([self.get_bbox(row['segment']) for row in row_json])
                 target.append([self.get_bbox(seg, resize) for seg in bboxes_true])

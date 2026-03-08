@@ -1,4 +1,6 @@
 from pager.page_model.sub_models.dtype import ImageSegment
+import numpy as np
+from ..intersect_util import get_num_regions_of_rows
 
 class Cacher:
     def __init__(self, conf):
@@ -20,14 +22,22 @@ class Cacher:
             self.tokenizer = conf['tokenizer']
         self.loger.time_log()
         self.loger("Create Cacher")
+
     def _get_true_edges(self, token, rows, region_segs, region_categories):
-        def is_one_region(row_seg_1, row_seg_2, region_segs):
-            for i, reg in enumerate(region_segs):
-                if reg.is_intersection(row_seg_1):
-                    if reg.is_intersection(row_seg_2):
-                        return 1
-                    else:
-                        return 0
+            
+        
+
+
+
+
+
+        def is_one_region(num_reg1, num_reg2):
+            if num_reg1 == None:
+                return 0
+            if num_reg2 == None:
+                return 0
+            if num_reg1 == num_reg2:
+                return 1
             return 0
 
         def get_category(seg, region_segs, region_categories):
@@ -47,7 +57,9 @@ class Cacher:
 
         row_segments = [get_mini_seg(row['segment']) for row in rows]
         A = token['inds']
-        true_edges = [is_one_region(row_segments[i], row_segments[j], region_segs) for i, j in zip(A[0], A[1])]
+        
+        nums_regions = get_num_regions_of_rows(region_segs, row_segments)
+        true_edges = [is_one_region(nums_regions[i], nums_regions[j]) for i, j in zip(A[0], A[1])]
         true_nodes = [get_category(row_seg, region_segs, region_categories) for row_seg in row_segments]
         return true_edges, true_nodes
 
