@@ -120,9 +120,9 @@ class Tester:
                     # pred_regions = aggregate_list_items(pred_regions)
 
                 bboxes_pred = [r['segment'] for r in pred_regions if r['label'] != 'other']
-                
+
                 # Очистка строк только для тестирования, в момент работы модели используются все строки, поскольку она училась на всех.
-                self.clean_rows(row_json, bboxes_true)
+                # self.clean_rows(row_json, bboxes_true)
                 word_grids.append([self.get_bbox(word['segment']) for row in row_json for word in row['words']])
                 row_grids.append([self.get_bbox(row['segment']) for row in row_json])
                 target.append([self.get_bbox(seg, resize) for seg in bboxes_true])

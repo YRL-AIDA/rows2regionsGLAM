@@ -32,9 +32,14 @@ class GLAMDataset(Dataset):
             raise Exception('Укажите папку до pdf файлов ("pdf_dir": path)')
         self.loger(f"Path Dataset: {self.pdf_dir}")
 
-        if "coco_file" in conf.keys(): 
-            self.coco_file  = conf["coco_file"] 
-            self.coco_manager = COCOManager({"loger": self.loger, "coco_path": self.coco_file})
+        if "pdf_manager" not in conf.keys():
+            raise Exception('Создайте и передайте pdf_manager')
+        else:
+            self.pdf_manager = conf['pdf_manager']
+
+        if "coco_file" in conf.keys():
+            self.coco_file  = conf["coco_file"]
+            self.coco_manager = COCOManager({"loger": self.loger, "coco_path": self.coco_file, "pdf_manager": self.pdf_manager})
         else:
             raise Exception('Укажите папку до COCO-разметки файлов ("coco_file": path)')
         self.loger(f"Path COCO: {self.coco_file}")
@@ -82,7 +87,10 @@ class GLAMDataset(Dataset):
         self.count = len(pdfs)
         self.pdf_names = [os.path.basename(pdf) for pdf in pdfs]
         self.cache_names = [os.path.basename(js) for js in jsons]
-        self.coco_ann = self.coco_manager.get_regions_from_json()[0]
+        if self.name_dataset == "omnidocbench":
+            self.coco_ann = self.coco_manager.convert_omnidocbench_to_custom_format()[0]
+        else:
+            self.coco_ann = self.coco_manager.get_regions_from_json()[0]
 
         if self.to_ROM:
             self.memory = dict()
@@ -104,9 +112,9 @@ class GLAMDataset(Dataset):
                 print(f"{i+1}/{N} ({(i+1)/N*100:.2f} %)" + " "*10, end="\r")
                 try:
                     path = os.path.join(self.cache_dir, file)
-                    with open(path, "r") as f: 
+                    with open(path, "r") as f:
                         j = json.load(f)
-                    for k in ["inds", "X", "Y", "N", "true_edges", "true_nodes"]:                    
+                    for k in ["inds", "X", "Y", "N", "true_edges", "true_nodes"]:
                         if not k in j:
                             key_error.append(i)
                             raise KeyError(f"{k} not in {file}")
@@ -158,19 +166,23 @@ class GLAMDataset(Dataset):
         data = {}
         if len(data_input.keys()) == 0:
             return {}
-        data['X'] = torch.tensor(data_input['X'], dtype=torch.float32).to(self.device)
-        data['Y'] = torch.tensor(data_input['Y'], dtype=torch.float32).to(self.device)
-        N = data_input["N"]
-        i = data_input['inds']
-        data["N"] = N
-        data['inds'] = i
-        index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
-        sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32).to(self.device)
-        data['sp_A'] = sp_A
-        data['true_edges'] = torch.tensor([0 if i is None else i for i in data_input['true_edges']], dtype=torch.float32).to(self.device)
-        data['true_nodes'] = self.__class_to_vec(data_input['true_nodes']).to(self.device)
-        # data['file_name'] = data_input['file_name']  #TODO: Вернуть после эксп
-        return data
+        try:
+            data['X'] = torch.tensor(data_input['X'], dtype=torch.float32).to(self.device)
+            data['Y'] = torch.tensor(data_input['Y'], dtype=torch.float32).to(self.device)
+            N = data_input["N"]
+            i = data_input['inds']
+            data["N"] = N
+            data['inds'] = i
+            index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
+            sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32).to(self.device)
+            data['sp_A'] = sp_A
+            data['true_edges'] = torch.tensor([0 if i is None else i for i in data_input['true_edges']], dtype=torch.float32).to(self.device)
+            data['true_nodes'] = self.__class_to_vec(data_input['true_nodes']).to(self.device)
+            data['file_name'] = data_input['file_name']
+            return data
+        except:
+            return {}
+
         
 
     def __len__(self):
@@ -193,7 +205,6 @@ class GLAMDataset(Dataset):
         name_file = self.pdf_names[idx]
         if self.to_ROM:    
             data = self.memory[idx] if idx >= 0 else self.memory[self.count+idx]
-            data['file_name'] = '.'.join(name_file.split('.')[:-1])  #TODO: Убрать после эксп
             return data
 
 
@@ -208,8 +219,8 @@ class GLAMDataset(Dataset):
 
             with open(path, 'r') as f:
                 data = json.load(f)
-        data['file_name'] ='.'.join(name_file.split('.')[:-1]) #TODO: Убрать после эксп
-        return self.get_torch_data(data) 
+        item_data = self.get_torch_data(data)
+        return item_data
 
     def cache_file(self, name_file):
         name_json = os.path.join(self.cache_dir, name_file + '.json')

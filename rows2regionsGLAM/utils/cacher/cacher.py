@@ -75,7 +75,7 @@ class Cacher:
         torch_dict = self.tokenizer(row_json, pdf_img)
         if name_dataset == "doclaynet":
             coef_w, coef_h = w / 1024, h / 1024
-        elif name_dataset == "publaynet":
+        else:
             coef_w, coef_h = 1, 1
         coco_dict_file['regions'] = [r for r in coco_dict_file['regions'] if r['segment']['height'] > 0]
         reg_segments = [ImageSegment(dict_p_size={
