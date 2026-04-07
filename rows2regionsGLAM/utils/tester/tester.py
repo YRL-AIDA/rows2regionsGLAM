@@ -86,19 +86,22 @@ class Tester:
         rows.extend(new_rows)
 
     def clean_bboxes_true(self, bboxes_true):
-        return [bbox_true for bbox_true in bboxes_true if bbox_true['height'] > 3 and bbox_true['width'] > 3]
+        return [i for i, bbox_true in enumerate(bboxes_true) if bbox_true['height'] > 3 and bbox_true['width'] > 3]
 
 
-    def calculate_target_and_preds(self, test_dataset, name_dataset, name_test_dataset, dataset_path, test_path):
+    def calculate_target_and_preds(self, test_dataset, name_dataset, name_test_dataset, dataset_path, test_path, name_classes=None):
         target = []
         preds = []
         word_grids = []
         row_grids = []
+        target_classes = []
+        preds_classes = []
         N = len(test_dataset)
         for i, d in enumerate(test_dataset):
             name_file = test_dataset.pdf_names[i]
             true_regions = test_dataset.coco_ann[name_file]['regions']
-            bboxes_true = self.clean_bboxes_true([reg['segment'] for reg in true_regions])
+            clean_indexs = self.clean_bboxes_true([reg['segment'] for reg in true_regions])
+            bboxes_true =[true_regions[index]['segment'] for index in clean_indexs]
             
             pdf_json, pdf_img = self.pdf_manager.get_json_and_img_from_pdf(os.path.join(test_path, name_file))
             w, h = pdf_json['width'],pdf_json['height']
@@ -123,6 +126,7 @@ class Tester:
                 
                 # Очистка строк только для тестирования, в момент работы модели используются все строки, поскольку она училась на всех.
                 self.clean_rows(row_json, bboxes_true)
+
                 word_grids.append([self.get_bbox(word['segment']) for row in row_json for word in row['words']])
                 row_grids.append([self.get_bbox(row['segment']) for row in row_json])
                 target.append([self.get_bbox(seg, resize) for seg in bboxes_true])
@@ -155,7 +159,6 @@ class Tester:
         map_metric = MeanAveragePrecision(box_format="xywh")
 
         get_category = lambda an: 1
-
         map_metric.update([dict(
             boxes=torch.tensor(bboxes_pred),
             scores=torch.tensor([1.0 for an in bboxes_pred]),
