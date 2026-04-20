@@ -2,7 +2,7 @@ from pager import PDFModel, RowsModel, PDF2Rows
 from pager.page_model.sub_models.dtype import Row, ImageSegment
 import numpy as np
 class RowManager:
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
@@ -11,10 +11,10 @@ class RowManager:
         self.loger("Create RowManager")
 
         if "add_image" not in conf.keys(): 
-            raise Exception('Добавлять к строкам изображения? ("add_image: True or False")')
-        else:
-            self.is_add_image = conf['add_image']
-            self.loger(f"Add image as row: {conf['add_image']}")
+            conf['add_image'] = True
+            
+        self.is_add_image = conf['add_image']
+        self.loger(f"Add image as row: {conf['add_image']}")
 
         self.pdf_model = PDFModel()
         self.rows_model = RowsModel()

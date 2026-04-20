@@ -2,7 +2,7 @@ from pager.doc_model import MinerPDFModel, PrecisionPDFModel
 from pager import PDF2Img, ImageModel, PDFModel
 
 class PDFManager:
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
@@ -10,13 +10,13 @@ class PDFManager:
         self.loger.time_log()
 
         if "pdf_reader" not in conf.keys(): 
-            raise Exception('Не выбран способ чтения ("pdf_reader": "PDFMiner" or "PrecisionPDF")')
-        elif conf['pdf_reader'] == "PDFMiner":
+            conf['pdf_reader'] = "PDFMiner"
+        if conf['pdf_reader'] == "PDFMiner":
             self.pdf_reader = MinerPDFModel()
         elif conf['pdf_reader'] == "PrecisionPDF":
             self.pdf_reader = PrecisionPDFModel()
         else:
-            raise Exception('Не выбран способ чтения ("pdf_reader": "PDFMiner" or "PrecisionPDF")')
+            raise Exception('Неверный способ чтения ("pdf_reader": "PDFMiner" or "PrecisionPDF")')
 
         self.loger(f"PDF Reader: {conf['pdf_reader']}")
 

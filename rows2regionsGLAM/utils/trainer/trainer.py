@@ -3,9 +3,9 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
-from ...models.rowGLAM_base import CustomLossBase, TorchModelBase
-from ...models.rowGLAM_custom import CustomLoss, TorchModel
+from ...models import get_loss, get_model
 from dotenv import load_dotenv
+
 env_file = os.path.join('..', '.env')
 load_dotenv(env_file)
 
@@ -26,7 +26,6 @@ class Trainer:
         self.loger.time_log()
         self.loger("Create Trainer")
         self.device = torch.device(os.environ.get('DEVICE', 'cpu'))
-        self.rowGlam_type = os.environ.get('ROW_GLAM_TYPE', 'base')
 
     def _validation(self, model, batch, criterion):     
         return self._step(model, batch, optimizer=None, criterion=criterion, train=False)
@@ -71,16 +70,11 @@ class Trainer:
             optimizer.step()
         return np.mean(my_loss_list)
 
-    def _train_model(self, model, dataset, save_frequency=5, start_epoch=0):  
+    def _train_model(self, model, dataset, criterion, save_frequency=5, start_epoch=0):  
         optimizer = torch.optim.Adam(
         list(model.parameters()),
         lr=self.params["learning_rate"],
         )
-        if self.rowGlam_type == "base":
-            criterion = CustomLossBase(self.params["loss_params"])
-        else:
-            criterion = CustomLoss(self.params["loss_params"])
-
         model.to(self.device)
         criterion.to(self.device)
 
@@ -135,7 +129,7 @@ class Trainer:
         print(checkpoint_path)
         return restart_num
 
-    def start_train(self, save_frequency, dataset, is_restart = False, restart_num = None):
+    def start_train(self, save_frequency, dataset, is_restart = False, restart_num = None, type_model='base'):
         if is_restart:
             self.loger("R E S T A R T ")
         self.loger.time_log()
@@ -148,12 +142,12 @@ class Trainer:
         except:
             print(dataset)
         self.params['sigmoidEdge'] = False
-        if self.rowGlam_type == "base":
-            model:torch.nn.Module = TorchModelBase(self.params)
-        else:
-            model: torch.nn.Module = TorchModel(self.params)
+       
+        criterion = get_loss(type_model, self.params['loss_params'])
+        model = get_model(type_model, self.params)
+
         if is_restart:
             restart_num = self._load_checkpoint(model, self.model_name)
         
         start_epoch = 0 if restart_num is None else (restart_num+1)*save_frequency
-        self._train_model(model, dataset, save_frequency=save_frequency, start_epoch=start_epoch)
+        self._train_model(model=model, dataset=dataset, criterion=criterion, save_frequency=save_frequency, start_epoch=start_epoch)

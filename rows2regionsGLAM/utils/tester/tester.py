@@ -22,19 +22,16 @@ DOC2PUB_MAP = {
 }
 
 class Tester:
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
             self.loger = conf['loger']
-        if "pdf_manager" not in conf.keys():
-            raise Exception('Создайте и передайте pdf_manager')
+
+        if "pred" not in conf.keys():
+            raise Exception('Создайте и передайте predProcessor')
         else:
-            self.pdf_manager = conf['pdf_manager']
-        if "row_manager" not in conf.keys():
-            raise Exception('Создайте и передайте row_manager')
-        else:
-            self.row_manager = conf['row_manager'] 
+            self.pred = conf['pred']
         if "rows_model" not in conf.keys():
             raise Exception('Создайте и передайте rows_model')
         else:
@@ -89,7 +86,7 @@ class Tester:
         return [i for i, bbox_true in enumerate(bboxes_true) if bbox_true['height'] > 3 and bbox_true['width'] > 3]
 
 
-    def calculate_target_and_preds(self, test_dataset, name_dataset, name_test_dataset, dataset_path, test_path, name_classes=None):
+    def calculate_target_and_preds(self, test_dataset):
         target = []
         preds = []
         word_grids = []
@@ -99,28 +96,23 @@ class Tester:
         N = len(test_dataset)
         for i, d in enumerate(test_dataset):
             name_file = test_dataset.pdf_names[i]
-            true_regions = test_dataset.coco_ann[name_file]['regions']
+            true_regions = test_dataset.coco_manager.regions[name_file]['regions']
             clean_indexs = self.clean_bboxes_true([reg['segment'] for reg in true_regions])
             bboxes_true =[true_regions[index]['segment'] for index in clean_indexs]
-            
-            pdf_json, pdf_img = self.pdf_manager.get_json_and_img_from_pdf(os.path.join(test_path, name_file))
-            w, h = pdf_json['width'],pdf_json['height']
-            if name_test_dataset == "doclaynet":
-                resize = (w/1024, h/1024)
-            else:
-                resize = (1, 1)
-            row_json = self.row_manager.get_row_json_from_pdf_json(pdf_json)   
+            row_json, pdf_img = self.pred.get_json_and_img(test_dataset.pdf_dir/name_file)
+            row_json = row_json['rows']
             
             self.rows_model.from_dict({"rows": row_json})
+           
             try:
                 self.rows2regions.convert(self.rows_model, self.region_model, pdf_img)
                 pred_regions = self.region_model.to_dict()['regions']
 
-                if name_dataset == "doclaynet" and name_test_dataset == "publaynet":
-                    for r in pred_regions:
-                        pub_label = DOC2PUB_MAP.get(r['label'], 'other')
-                        r['label'] = pub_label
-                    # pred_regions = aggregate_list_items(pred_regions)
+                # if name_dataset == "doclaynet" and name_test_dataset == "publaynet":
+                #     for r in pred_regions:
+                #         pub_label = DOC2PUB_MAP.get(r['label'], 'other')
+                #         r['label'] = pub_label
+                #     # pred_regions = aggregate_list_items(pred_regions)
 
                 bboxes_pred = [r['segment'] for r in pred_regions if r['label'] != 'other']
                 
@@ -129,9 +121,10 @@ class Tester:
 
                 word_grids.append([self.get_bbox(word['segment']) for row in row_json for word in row['words']])
                 row_grids.append([self.get_bbox(row['segment']) for row in row_json])
-                target.append([self.get_bbox(seg, resize) for seg in bboxes_true])
+                target.append([self.get_bbox(seg) for seg in bboxes_true])
                 preds.append([self.get_bbox(seg) for seg in bboxes_pred])
-            except:
+            except Exception as e:
+                print(e)
                 print(i,d["file_name"])
 
             
@@ -174,14 +167,7 @@ class Tester:
         return map_metric_rez
 
     def print_result(self, metrics):
-        target = metrics[0]
-        preds = metrics[1]
-        word_grids = metrics[2]
-        row_grids = metrics[3]
-
-        map_metric_rez = self.calculate_map_metric(preds, target)
-        grid_metric = self.calculate_grid_metric(target, preds, word_grids, row_grids)
-
+        map_metric_rez, grid_metric = self.get_results(metrics)
         print(map_metric_rez)
         print(grid_metric)
         self.loger("Test Result")

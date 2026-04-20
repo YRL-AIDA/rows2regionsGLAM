@@ -4,20 +4,11 @@ import json
 import numpy as np
 import os 
 from ...utils.coco_manager import COCOManager
-from json import JSONEncoder 
-import warnings
-
-def cache_exists(cache_path):
-    """Проверяет, существует ли кэшированный файл."""
-    return os.path.exists(cache_path)
-
-def load_cache(cache_path):
-    """Загружает кэшированные данные."""
-    with open(cache_path, 'r') as f:
-        return json.load(f)
+from ...utils.cacher import Cacher
+from pathlib import Path
 
 class GLAMDataset(Dataset):
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
@@ -26,27 +17,29 @@ class GLAMDataset(Dataset):
         self.loger("Create Dataset")
 
         if "pdf_dir" in conf.keys(): 
-            self.pdf_dir  = conf["pdf_dir"] 
+            self.pdf_dir  = Path(conf["pdf_dir"])
         else:
             raise Exception('Укажите папку до pdf файлов ("pdf_dir": path)')
         self.loger(f"Path Dataset: {self.pdf_dir}")
 
-        if "coco_file" in conf.keys(): 
-            self.coco_file  = conf["coco_file"] 
-            self.coco_manager = COCOManager({"loger": self.loger, "coco_path": self.coco_file})
-        else:
-            raise Exception('Укажите папку до COCO-разметки файлов ("coco_file": path)')
-        self.loger(f"Path COCO: {self.coco_file}")
+        # if "coco_file" in conf.keys(): 
+        #     self.coco_file  = conf["coco_file"] 
+        #     self.coco_manager = COCOManager({"loger": self.loger, "coco_path": self.coco_file})
+        # else:
+        #     raise Exception('Укажите папку до COCO-разметки файлов ("coco_file": path)')
+        # self.loger(f"Path COCO: {self.coco_file}")
 
-        if "count_class" in conf.keys(): 
-            self.count_class = conf["count_class"] 
+        if "coco_manager" in conf.keys(): 
+            self.coco_manager = conf['coco_manager']
+    
+            self.count_class = len(self.coco_manager.classes)
         else:
             raise Exception('Укажите число классов в наборе ("count_class": int)')
 
-        if "name_dataset" in conf.keys():
-            self.name_dataset = conf["name_dataset"]
-        else:
-            raise Exception('Укажите название набора данных ("name_dataset" : str)')
+        # if "name_dataset" in conf.keys():
+        #     self.name_dataset = conf["name_dataset"]
+        # else:
+        #     raise Exception('Укажите название набора данных ("name_dataset" : str)')
 
         if "default_index" in conf.keys(): 
             self.default_index = conf["default_index"] 
@@ -54,27 +47,25 @@ class GLAMDataset(Dataset):
             raise Exception('Укажите индекс класса по умолчанию ("default_index": int)')
 
         if "cache_dir" in conf.keys():
-            self.cache_dir = conf["cache_dir"]
-            if os.path.exists(self.cache_dir):
-                if len(os.listdir(self.cache_dir)) != 0:
-                    warnings.warn("Кеш не пустой !!!", DeprecationWarning)
-            else:
-                os.mkdir(self.cache_dir)
+            self.cacher = Cacher(cache_dir=conf["cache_dir"], 
+                                 cache_fun=self.pdf2json_for_model)
         else:
             raise Exception('Укажите папку для cache ("cache_dir": path)')
         
-        if "pdf2torch_dict" in conf.keys(): 
-            self.pdf2torch_dict = conf["pdf2torch_dict"] 
+        if "pred" in conf.keys(): 
+            self.pred = conf["pred"] 
         else:
-            raise Exception('Напишите функцию перевода pdf в torch_dict ("pdf2torch_dict": pdf2torch_dict(path_pdf, coco_dict_file) )')
+            raise Exception('Напишите функцию перевода pdf в torch_dict ("pred": pred(path_pdf))')
 
         pdfs = [f for f in os.listdir(self.pdf_dir) if f.split('.')[-1] == 'pdf' and not os.path.isdir(f)]
-        jsons = [f for f in os.listdir(self.cache_dir)]
         pdfs.sort()
         self.count = len(pdfs)
         self.pdf_names = [os.path.basename(pdf) for pdf in pdfs]
-        self.cache_names = [os.path.basename(js) for js in jsons]
-        self.coco_ann = self.coco_manager.get_regions_from_json()[0]
+
+    def pdf2json_for_model(self, name_file):
+        torch_dict = self.pred(self.pdf_dir/name_file)
+        del torch_dict['sp_A']
+        return torch_dict
 
     def test_cache(self): 
         files  = sorted(os.listdir(self.cache_dir))
@@ -142,17 +133,7 @@ class GLAMDataset(Dataset):
 
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
-        if not name_file+'.json' in self.cache_names:
-            try:
-                data = self.cache_file(name_file)
-            except:
-                # self.loger(f"ERROR file: {name_file}")
-                return {}
-        else:
-            path = os.path.join(self.cache_dir, name_file+'.json')
-
-            with open(path, 'r') as f:
-                data = json.load(f)
+        data = self.cacher(name_file)
         if len(data.keys()) == 0:
             return {}
         data['X'] = torch.tensor(data['X'], dtype=torch.float32)
@@ -167,18 +148,7 @@ class GLAMDataset(Dataset):
         data['file_name'] = '.'.join(name_file.split('.')[:-1])
         return data
 
-    def cache_file(self, name_file):
-        name_json = os.path.join(self.cache_dir, name_file + '.json')
-
-        if cache_exists(name_json):
-            return load_cache(name_json)
-
-        path_file = os.path.join(self.pdf_dir, name_file)
-        json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file], self.name_dataset)
-        with open(name_json, 'w') as f:
-            json.dump(json_res, f, cls=EncodeTensor)
-        self.cache_names.append(os.path.basename(name_json))
-        return json_res
+    
 
     def __str__(self):
         return f"""
@@ -195,11 +165,3 @@ class GLAMDataset(Dataset):
             \t edges_feature:{np.shape(self[-1]["Y"])}
             \t true_edges:{np.shape(self[-1]["true_edges"])}
         """
-    
-
-
-class EncodeTensor(JSONEncoder, Dataset):  
-    def default(self, obj):
-        if isinstance(obj, torch.Tensor):  
-            return obj.cpu().detach().numpy().tolist()  
-        return super(EncodeTensor, self).default(obj)  
