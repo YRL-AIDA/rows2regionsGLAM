@@ -32,8 +32,13 @@ class PDFManager:
         return self.pdf_model.to_dict()
 
     def get_json_and_img_from_pdf(self, pdf_path, num_page=0):
-        self.pdf_reader.read_from_file(pdf_path)
-        self.pdf_reader.extract()
+        try:
+            self.pdf_reader.read_from_file(pdf_path)
+            self.pdf_reader.extract()
+        except Exception as e:
+            print(e)
+            print("Ошибка чтения PDF", pdf_path)
+            return {} , None
         self.pdf_model.from_dict(self.pdf_reader.to_dict()['pages'][num_page])
         self.pdf_model.path = pdf_path
         self.pdf_model.num_page = num_page

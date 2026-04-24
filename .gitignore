@@ -207,6 +207,7 @@ marimo/_lsp/
 __marimo__/
 
 .DS_Store
+.vscode
 
 log.txt
 error_list_file.txt

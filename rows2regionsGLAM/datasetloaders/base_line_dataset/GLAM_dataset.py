@@ -133,7 +133,12 @@ class GLAMDataset(Dataset):
 
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
-        data = self.cacher(name_file)
+        try:
+            data = self.cacher(name_file)
+        except Exception as e:
+            print(e)
+            print("cache error", name_file)
+            return {}
         if len(data.keys()) == 0:
             return {}
         data['X'] = torch.tensor(data['X'], dtype=torch.float32)
