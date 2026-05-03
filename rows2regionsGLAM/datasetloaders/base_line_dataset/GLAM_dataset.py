@@ -155,16 +155,20 @@ class GLAMDataset(Dataset):
                 data = json.load(f)
         if len(data.keys()) == 0:
             return {}
-        data['X'] = torch.tensor(data['X'], dtype=torch.float32)
-        data['Y'] = torch.tensor(data['Y'], dtype=torch.float32)
-        N = data["N"]
-        i = data['inds']
-        index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
-        sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32)
-        data['sp_A'] = sp_A
-        data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32)
-        data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
-        data['file_name'] = '.'.join(name_file.split('.')[:-1])
+        try:
+            data['X'] = torch.tensor(data['X'], dtype=torch.float32)
+            data['Y'] = torch.tensor(data['Y'], dtype=torch.float32)
+            N = data["N"]
+            i = data['inds']
+            index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
+            sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32)
+            data['sp_A'] = sp_A
+            data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32)
+            data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
+            data['file_name'] = '.'.join(name_file.split('.')[:-1])
+        except:
+            print(name_file)
+            return {}
         return data
 
     def cache_file(self, name_file):
