@@ -86,8 +86,8 @@ class Tester:
         rows.clear()
         rows.extend(new_rows)
 
-    def clean_bboxes_true(self, bboxes_true):
-        return [bbox_true for bbox_true in bboxes_true if bbox_true['height'] > 3 and bbox_true['width'] > 3]
+    def clean_true_regions(self, true_regions):
+        return [reg for reg in true_regions if reg['segment']['height'] > 3 and reg['segment']['width'] > 3]
 
 
 
@@ -98,12 +98,15 @@ class Tester:
         row_grids = []
         target_cls = []
         preds_cls = []
+
+        id2name = test_dataset.coco_manager.coco_classes
+        name2id = {name:id_ for id_, name in id2name.items()}
+        
         N = len(test_dataset)
         for i, d in enumerate(test_dataset):
             name_file = test_dataset.pdf_names[i]
             true_regions = test_dataset.coco_manager.regions[name_file]['regions']
-            clean_indexs = self.clean_bboxes_true([reg['segment'] for reg in true_regions])
-            clean_bboxes = [true_regions[index] for index in clean_indexs]
+            clean_bboxes = self.clean_true_regions(true_regions)
             bboxes_true =[reg['segment'] for reg in clean_bboxes]
             classes_true = [reg['category_id'] for reg in clean_bboxes]
             row_json, pdf_img = self.pred.get_json_and_img(test_dataset.pdf_dir/name_file)
@@ -123,7 +126,7 @@ class Tester:
                 filtered_preds = [r for r in pred_regions if r['label'] != 'other']
 
                 bboxes_pred = [r['segment'] for r in filtered_preds]
-                classes_pred = [r['label'] for r in filtered_preds]
+                classes_pred = [name2id[r['label']] for r in filtered_preds]
 
                 # Очистка строк только для тестирования, в момент работы модели используются все строки, поскольку она училась на всех.
                 # self.clean_rows(row_json, bboxes_true)
@@ -139,11 +142,11 @@ class Tester:
 
             print(f"{(i + 1) / N * 100:4.2f} %", end='\r')
 
-        return [target, preds, word_grids, row_grids, target_cls, preds_cls]
+        return [target, preds, word_grids, row_grids, target_cls, preds_cls, id2name]
 
-    def calculate_grid_metric(self, target, preds, word_grids, row_grids):
+    def calculate_grid_metric(self, preds, target, preds_cls, target_cls, word_grids, row_grids, dict_classes=None):
         grid_metric = GridMetric()
-
+        
         i = 0
         N = len(preds)
         for bboxes_pred, bboxes_true, grid_row, grid_word in zip(preds, target, row_grids, word_grids):
@@ -154,8 +157,10 @@ class Tester:
             except:
                 pass
         grid_metric.update()
-
-        return grid_metric
+        cls_iougrid_row = classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids, dict_classes=dict_classes)
+        cls_iougrid_row["F1@IoUGrid[0.50] (all)"]= float(grid_metric.rez['threshold_05']['f1_row'])
+        cls_iougrid_row["F1@IoUGrid[0.95] (all)"]= float(grid_metric.rez['threshold_95']['f1_row'])
+        return cls_iougrid_row
 
     def calculate_map_metric(self, preds, target):
         map_metric = MeanAveragePrecision(box_format="xywh")
@@ -172,79 +177,60 @@ class Tester:
                 labels=torch.tensor([get_category(an) for an in bboxes_true]),
             ) for bboxes_true in target])
         rez = map_metric.compute()
-        map_metric_rez = f"mAP@IoU[0.50:0.95]   :{rez['map']:.8f}"
 
-        return map_metric_rez
+        return {
+            "name": "mAP@IoU[0.50:0.95]",
+            "mAP (seg)": rez['map']
+        }
 
-    def calculate_map_with_classes(self, preds, target, preds_cls, target_cls):
+
+    def calculate_map_with_classes(self, preds, target, preds_cls, target_cls, dict_classes=None):
         map_metric = MeanAveragePrecision(box_format="xywh", class_metrics=True)
-
-        classes = sorted(set(
-            c for lst in target_cls + preds_cls for c in lst
-        ))
-        class2id = {c: i for i, c in enumerate(classes)}
 
         map_metric.update(
             [dict(
                 boxes=torch.tensor(b),
                 scores=torch.tensor([1.0] * len(b)),
-                labels=torch.tensor([class2id[c] for c in cls])
+                labels=torch.tensor(cls)
             ) for b, cls in zip(preds, preds_cls)],
 
             [dict(
                 boxes=torch.tensor(b),
-                labels=torch.tensor([class2id[c] for c in cls])
+                labels=torch.tensor(cls)
             ) for b, cls in zip(target, target_cls)]
         )
 
         rez = map_metric.compute()
-
-        lines = [f"mAP@IoU[0.50:0.95] (with classes): {rez['map']:.6f}"]
-        return "\n".join(lines)
-
-    def normalize_target_classes(self, target_cls, id2name):
-        return [[id2name[c] for c in sample] for sample in target_cls]
-
-    def normalize_pred_classes(self, preds_cls):
-        return [[str(c) for c in sample] for sample in preds_cls]
+        
+        # lines = [f"mAP@IoU[0.50:0.95] (with classes): {rez['map']:.6f}"]
+        rez_segment = self.calculate_map_metric(preds,target)
+        reg_classes = rez['classes']
+        reg_per = rez['map_per_class']
+        dict_rez = {
+            "name": "mAP@IoU[0.50:0.95]",
+            "mAP (all)": float(rez['map']),
+            "mAP (seg)": float(rez_segment['mAP (seg)'])
+        }
+        for map_cls, cls in zip(reg_per, reg_classes):
+            dict_rez[f"mAP ({int(cls)if dict_classes is None else dict_classes[int(cls)]})"] = float(map_cls)
+        return dict_rez 
 
     def print_result(self, metrics):
-        map_metric_rez, grid_metric, map_cls, iou_metrics, row_iou_metrics = self.get_results(metrics)
-
-        print(map_metric_rez)
-        print(grid_metric)
-
-        print(map_cls)
-        print(iou_metrics)
-        print(row_iou_metrics)
+        grid_cls, map_cls = self.get_results(metrics)
+        seg_str_map =f'{map_cls["name"]} (segmentation): {map_cls['segmentation']:.4f}'
+        cls_str_map =f'{map_cls["name"]} (with classification): {map_cls['all']:.4f}'
+      
+        print(seg_str_map)
+        print(cls_str_map)
+        print(grid_cls)
         self.loger("Test Result")
-        self.loger(map_metric_rez)
-        self.loger(grid_metric.__str__())
+        self.loger(seg_str_map)
+        self.loger(cls_str_map)
+        self.loger(grid_cls)
+
 
     def get_results(self, metrics):
-
-        id2name = {
-            1: 'text',
-            2: 'title',
-            3: 'text',
-            4: 'table',
-            5: 'figure',
-            0: 'other'
-        }
-
-        target, preds, word_grids, row_grids, target_cls, preds_cls = metrics
-
-        target_cls = self.normalize_target_classes(target_cls, id2name)
-        preds_cls = self.normalize_pred_classes(preds_cls)
-
-        map_old = self.calculate_map_metric(preds, target)
-
-        map_cls = self.calculate_map_with_classes(preds, target, preds_cls, target_cls)
-
-        iou_metrics = classification_metrics_iou(preds, target, preds_cls, target_cls)
-
-        row_iou_metrics = classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids)
-
-        grid_metric = self.calculate_grid_metric(target, preds, word_grids, row_grids)
-
-        return map_old, grid_metric, map_cls, iou_metrics, row_iou_metrics
+        target, preds, word_grids, row_grids, target_cls, preds_cls, id2name = metrics
+        map_cls = self.calculate_map_with_classes(preds, target, preds_cls, target_cls, dict_classes=id2name)
+        grid_cls = self.calculate_grid_metric(preds, target, preds_cls, target_cls, word_grids, row_grids, dict_classes=id2name)
+        return  grid_cls, map_cls

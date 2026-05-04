@@ -75,11 +75,11 @@ def classification_metrics_iou(preds, target, preds_cls, target_cls, thresholds=
 from rows2regionsGLAM.metrics.grid_metrics import gridIoU
 
 
-def classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids, thresholds=(0.5, 0.95)):
+def classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids, thresholds=(0.5, 0.95), dict_classes=None):
     from collections import defaultdict
     from pager import ImageSegment
 
-    all_classes = sorted(list(set(c for lst in preds_cls + target_cls for c in lst)))
+    all_classes = [id_ for id_, name in dict_classes.items()]
 
     def to_segments(boxes):
         return [
@@ -134,7 +134,7 @@ def classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids,
                 if j not in used_gt:
                     FN[gt_class] += 1
 
-        lines = [f"\ngridIoU threshold = {th}"]
+        metrics = {}
         for cls in all_classes:
             tp = TP[cls]
             fp = FP[cls]
@@ -143,9 +143,13 @@ def classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids,
             p = tp / (tp + fp) if tp + fp > 0 else 0
             r = tp / (tp + fn) if tp + fn > 0 else 0
             f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0
+            metrics[cls] = {
+                "P":p,
+                "R":r,
+                "F1":f1
+            }
+            
 
-            lines.append(f"{cls:15s} | P: {p:.4f} | R: {r:.4f} | F1: {f1:.4f}")
+        return metrics
 
-        return "\n".join(lines)
-
-    return "\n".join(compute_for_threshold(th) for th in thresholds)
+    return {f"{name_m}@IoUGrid[{str(th)}] ({cls if dict_classes is None else dict_classes[int(cls)]})":m  for th in thresholds for cls, metric in compute_for_threshold(th).items() for name_m, m in metric.items()}

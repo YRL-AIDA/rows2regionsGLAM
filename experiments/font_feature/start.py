@@ -83,8 +83,8 @@ def fun_get_model_with_param(param):
             "batchNormEdge": True,
             "seg_k": 0.5,
             "loss_params": {
-                "edge_coef": 0.8,
-                "node_coef": 0.2,
+                "edge_coef": 0.2,
+                "node_coef": 0.8,
             },
             "sigmoidEdge": False,
             "NodeClasses": 6 # len(CLASSES)
@@ -122,8 +122,8 @@ def fun_get_model_with_param(param):
                  {"in" : -1, "batch_norm" : False, "activation" : None,   "out" : 1}],
             "seg_k": 0.5,
             "loss_params": {
-                "edge_coef": 0.8,
-                "node_coef": 0.2,
+                "edge_coef": 0.2,
+                "node_coef": 0.8,
             },
             "sigmoidEdge": False,
         }
@@ -198,17 +198,12 @@ def fun_test_model_with_param(model, dataset, param):
 
     metrics = tester.calculate_target_and_preds(test_dataset)
 
-    mAP, grid = tester.get_results(metrics)
-    return {"map": mAP.split(':')[-1], "grid": grid }
+    grid_cls, map_cls = tester.get_results(metrics)
+    
+    return {**grid_cls, **map_cls}
 
 def fun_result_to_row(train_result, test_result):
-    mAP = test_result['map']
-    grid = test_result['grid']
-    return {
-        "mAP@IoU[0.50:0.95]": float(mAP),
-        "F1@IoU_row[0.50]": grid['threshold_05']['f1_row'],
-        "F1@IoU_row[0.95]": grid['threshold_95']['f1_row']
-    }
+    return test_result
 
 if __name__ == "__main__":
     train_dataset_path = os.environ['DATASET_PATH']

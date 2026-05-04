@@ -59,7 +59,7 @@ class COCOManager:
         for cat in coco['categories']:
             coco_classes[cat["id"]] = cat["name"]
         coco_classes[0] = 'other'
-
+        self.coco_classes = coco_classes
         return pdf_ann, coco_classes
     
     def __call__(self, name_pdf, page_info):
