@@ -71,46 +71,56 @@ def fun_get_model_with_param(param):
         model_params = {
             "node_block": { # Первый слой содержит число features
                 "linear_pred": [
-                    {"in": 15, "out": 64, "activation": "gelu"},
-                    {"in": 64, "out": 128, "activation": "gelu"},
+                    {"in": 15, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
                 ],
                 "gnn": [
                     ("tag", {"batch_norm": True, "concat": True,
-                             "in":128,  "in_gnn":512, "out_gnn":512, 
+                             "in":128,  "in_gnn":256, "out_gnn":128, 
                              "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
-                    ("tag", {"concat": True,
-                             "in":512+128, "in_gnn":256, "out_gnn":256, 
+                    ("tag", {"batch_norm": False,"concat": True,
+                             "in":128+128, "in_gnn":256, "out_gnn":128, 
                              "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                         ],
-                "linear_post": [ # PRED похож на POST
-                    {"in": 512+128+256, "out": 256, "activation": "gelu"},
-                    {"in": 256, "out": 128, "activation": "gelu"},
-                    {"in": 128, "out": 32, "activation": "gelu"},
-                ]
+                # "linear_post": [ # PRED похож на POST
+                #     {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                #     {"in": 256, "out": 128, "activation": "gelu"},
+                #     {"in": 128, "out": 32, "activation": "gelu"},
+                # ]
             },
             "node_classifier_block": {
                 "linear_post": [ # Удобно задать MLP как только POST часть
-                    {"in": 32, "out": 16, "activation": "gelu"},
-                    {"in": 16, "out": 8, "activation": "gelu"},
-                    {"in": 8, "out": 6, "activation": "softmax"},
+                    {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
+                    {"in": 128, "out": 6, "activation": "softmax"},
                 ]
             },
             "post_node_block": {
+                "linear_pred": [
+                    {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
+                ],
                 "gnn": [
                     ("tag", {"batch_norm": True, "concat": True,
-                             "in":32,  "in_gnn":16, "out_gnn":16, 
+                             "in":128,  "in_gnn":256, "out_gnn":128, 
                              "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
-                    ("tag", {"concat": True,
-                             "in":32+16, "in_gnn":32, "out_gnn":16, 
+                    ("tag", {"batch_norm": False,"concat": True,
+                             "in":128+128, "in_gnn":256, "out_gnn":128, 
                              "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                         ],
+                "linear_post": [ # PRED похож на POST
+                    {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
+                    {"in": 128, "out": 128, "activation": "gelu"},
+                ]
             }, # НЕ ОБЯЗАТЕЛЬНЫЙ
             # "conjugate_edge_block": {}, # НЕ ОБЯЗАТЕЛЬНЫЙ
             "edge_classifier_block": {
                  "linear_post": [ # Удобно задать MLP как только POST часть
-                    {"in": 2*(64+15)+4, "out": 64, "activation": "gelu"},
-                    {"in": 64, "out": 8, "activation": "gelu"},
-                    {"in": 8, "out": 1, "activation": "none"},
+                    {"in": 2*(128+15)+4, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 64, "activation": "gelu"},
+                    {"in": 64, "out": 1, "activation": "none"},
                 ]
             }
         }
@@ -140,7 +150,7 @@ def fun_get_model_with_param(param):
             "mlp_node_edge":[
                  {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
                  {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 128},
-                 {"in" : -1, "batch_norm" : False, "activation" : None,   "out" : 128}],
+                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 128}],
             "mlp_edge_class":[
                  {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
                  {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 64},
@@ -212,17 +222,12 @@ def fun_test_model_with_param(model, dataset, param):
 
     metrics = tester.calculate_target_and_preds(test_dataset)
 
-    mAP, grid = tester.get_results(metrics)
-    return {"map": mAP.split(':')[-1], "grid": grid }
+    grid_cls, map_cls = tester.get_results(metrics)
+    
+    return {**grid_cls, **map_cls}
 
 def fun_result_to_row(train_result, test_result):
-    mAP = test_result['map']
-    grid = test_result['grid']
-    return {
-        "mAP@IoU[0.50:0.95]": float(mAP),
-        "F1@IoU_row[0.50]": grid['threshold_05']['f1_row'],
-        "F1@IoU_row[0.95]": grid['threshold_95']['f1_row']
-    }
+    return test_result
 
 if __name__ == "__main__":
     train_dataset_name = os.environ['NAME_DATASET']
@@ -253,7 +258,7 @@ if __name__ == "__main__":
             "test_param": {"type": name_model}
         }
     
-        for name_model in ['main', 'base', 'custom'] # 
+        for name_model in ['main',  'custom'] # 'base',
     }
     exp.experiment(
         fun_get_model_with_param, 

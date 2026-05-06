@@ -32,58 +32,88 @@ def grid_Precision_and_Recall(bboxes_pred:list[ImageSegment], bboxes_true:list[I
         
         return 0.0 if dem == 0 else float(num/dem)
         
-    mtrx = np.array([
-        [get_iou(it, ip) for it, _ in enumerate(bboxes_true)] 
-        for ip, _ in enumerate(bboxes_pred)
-    ])
-    TP = int(sum(mtrx.max(axis=0)>threshold))        
-    TP_pl_FP = len(bboxes_pred) 
-    TP_pl_TN = len(bboxes_true)
+    res = [[(get_iou(it, ip), it) for it, _ in enumerate(bboxes_true)]  for ip, _ in enumerate(bboxes_pred)]
+    res = [sorted([r for r in p if p[0]>threshold], key=lambda r: r[0], reverse=True) for p in res]
+
+    t_no = []
+    TP = 0
+    for p in res:
+        for r in p:
+            it = r[1]
+            if it is t_no:
+               continue
+            t_no.append(it)
+            TP+=1
+     
+    TP_pl_FP  = len(bboxes_pred) 
+    TP_pl_FN  = len(bboxes_true)
     precision = TP/TP_pl_FP 
-    recall = TP/TP_pl_TN
+    recall    = TP/TP_pl_FN
     return precision, recall
 
+class MultiGridMetric:
+    def __init__(self):
+        self.grid_metrics = dict()
+
+    def update(self, preds_dicts, target_dicts, row_grids, word_grids):
+        
+        labels = set([preds_dict['labels'] for preds_dict in preds_dicts]) | set([target_dict['labels'] for target_dict in target_dicts])
+        for label in labels:
+            grid_metric = GridMetric()
+            grid_metric.update(
+                preds=[[p for p, l in zip(preds_dict['boxes'], preds_dict['labels']) if l == label] for preds_dict in preds_dicts],
+                target=[[t for t, l in zip(target_dict['boxes'], target_dict['labels']) if l == label] for target_dict in target_dicts],
+                row_grids=row_grids, word_grids=word_grids
+            )
+            self.grid_metrics[label] = grid_metric
+        
+        grid_metric = GridMetric()
+        grid_metric.update(
+                preds=[preds_dict['boxes'] for preds_dict in preds_dicts],
+                target=[target_dict['boxes'] for target_dict in target_dicts],
+                row_grids=row_grids, word_grids=word_grids
+            )
+        self.grid_metrics['all'] = grid_metric
+
+    def compute(self):
+        rezs = dict()
+        for label, grid_metric in self.grid_metrics.items():
+            rez = grid_metric.compute()
+            for th, metrics in rez.items():
+                rezs[f'{th} ({label})'] = metrics['f1_row']
 
 class GridMetric:
     def __init__(self, box_format="xywh"):
+        self.coef = [0.5, 0.95]
         self.arrays = {
-            "threshold_05": {
+            f"threshold_{coef}": {
                 "all_precision_row": [],
                 "all_recall_row": [],
                 "all_precision_word": [],
-                "all_recall_word": []
-            }, 
-            "threshold_95": {
-                "all_precision_row": [],
-                "all_recall_row": [],
-                "all_precision_word": [],
-                "all_recall_word": []
-            }, 
+                "all_recall_word": [],
+                "all_f1_word": [],
+                "all_f1_row": []
+            } for coef in self.coef
         }
 
         self.rez = {
-            "threshold_05": {
+            f"threshold_{coef}": {
                 "precision_row": None,
                 "recall_row": None,
                 "f1_row": None,
                 "precision_word": None,
                 "recall_word": None,
                 "f1_word": None
-            }, 
-            "threshold_95": {
-                "precision_row": None,
-                "recall_row": None,
-                "f1_row": None,
-                "precision_word": None,
-                "recall_word": None,
-                "f1_word": None
-            },  
+            } for coef in self.coef
         }
         if box_format not in ["xywh", "xyxy"]:
             raise Exception('Не верный формат ("xywh", "xyxy")')
         self.box_format = box_format
 
-    def add_pair(self, bboxes_pred, bboxes_true, grid_row, grid_word):
+    def update(self, preds, target, row_grids, word_grids):
+        i = 0
+        N = len(preds)
+
         if self.box_format == "xywh":
             def get_segs(blocks):
                 return [ImageSegment(x_top_left=block[0], 
@@ -96,47 +126,72 @@ class GridMetric:
                                      y_top_left=block[1],
                                      x_bottom_right=block[2],
                                      y_bottom_right=block[3]) for block in blocks]
-        seg_bboxes_pred = get_segs(bboxes_pred)
-        seg_bboxes_true = get_segs(bboxes_true)
-        seg_grid_row = get_segs(grid_row)
-        seg_grid_word = get_segs(grid_word)
-        rez = {
-            "threshold_05":self._get_pair_threshold(seg_bboxes_pred, seg_bboxes_true, seg_grid_row, seg_grid_word, 0.50),
-            "threshold_95":self._get_pair_threshold(seg_bboxes_pred, seg_bboxes_true, seg_grid_row, seg_grid_word, 0.95)
-        } 
-        for th, th_rez in self.arrays.items():
-            loc_th_rez = rez[th]
-            for metric, ans in loc_th_rez.items():
-                th_rez["all_"+metric].append(ans)
-                
+
+
+        for bboxes_pred, bboxes_true, grid_row, grid_word in zip(preds, target, row_grids, word_grids):
+            i += 1
+            try:
+                seg_bboxes_pred = get_segs(bboxes_pred)
+                seg_bboxes_true = get_segs(bboxes_true)
+                seg_grid_row = get_segs(grid_row)
+                seg_grid_word = get_segs(grid_word)
+                rez = {
+                    f"threshold_{coef}":self._get_pair_threshold(seg_bboxes_pred, seg_bboxes_true, seg_grid_row, seg_grid_word, coef)
+                    for coef in self.coef
+                } 
+                for th, th_rez in self.arrays.items():
+                    loc_th_rez = rez[th]
+                    for metric, ans in loc_th_rez.items():
+                        th_rez["all_"+metric].append(ans)
+                print(f"{(i) / N * 100:4.2f} %", end='\r')
+            except:
+                pass
+        self.__update()
+    
+    def compute(self):
+        return self.rez
+
         
         
     def _get_pair_threshold(self, bboxes_pred, bboxes_true, grid_row, grid_word, threshold):
-        precision_row, recall_row = grid_Precision_and_Recall(bboxes_pred, bboxes_true, grid_row, threshold)
-        precision_word, recall_word = grid_Precision_and_Recall(bboxes_pred, bboxes_true, grid_word, threshold)
+        if len(bboxes_pred) == 0 and len(bboxes_true) == 0:
+            precision_row, recall_row, precision_word, recall_word = 1, 1, 1, 1
+        elif len(bboxes_pred) == 0:
+            precision_row,  precision_word = 1, 1
+            recall_row, recall_word = 0, 0 
+        elif len(bboxes_true) == 0:
+            precision_row,  precision_word = 0, 0
+            recall_row, recall_word = 1, 1
+        else:
+            precision_row, recall_row = grid_Precision_and_Recall(bboxes_pred, bboxes_true, grid_row, threshold)
+            precision_word, recall_word = grid_Precision_and_Recall(bboxes_pred, bboxes_true, grid_word, threshold)
 
         return {
             "precision_row": precision_row,
             "recall_row": recall_row,
+            "f1_row": 2*precision_row*recall_row/(precision_row+recall_row) if precision_row+recall_row > 0 else 0,
             "precision_word": precision_word,
-            "recall_word": recall_word
+            "recall_word": recall_word,
+            "f1_word": 2*precision_word*recall_word/(precision_word+recall_word) if precision_word+recall_word > 0 else 0
         }
 
 
     
-    def update(self):
+    def __update(self):
         for th, th_rez in self.arrays.items():
             p_r = np.mean(th_rez["all_precision_row"])
             p_w = np.mean(th_rez["all_precision_word"])
             r_r = np.mean(th_rez["all_recall_row"])
             r_w = np.mean(th_rez["all_recall_word"])
+            f_r = np.mean(th_rez["all_f1_row"])
+            f_w = np.mean(th_rez["all_f1_word"])
             self.rez[th] = {
                 "precision_row": p_r,
                 "recall_row": r_r,
-                "f1_row": 2*p_r*r_r/(p_r+r_r),
+                "f1_row": f_r,
                 "precision_word": p_w,
                 "recall_word": r_w,
-                "f1_word": 2*p_w*r_w/(p_w+r_w)
+                "f1_word": f_w
             }
             
         

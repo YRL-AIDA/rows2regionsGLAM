@@ -3,7 +3,7 @@ import os
 import torch
 import numpy as np
 from pager import ImageSegment
-from rows2regionsGLAM.metrics import GridMetric
+from rows2regionsGLAM.metrics import MultiGridMetric
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 from rows2regionsGLAM.utils.tester.metrics_per_class import classification_metrics_iou, classification_metrics_grid
@@ -145,47 +145,27 @@ class Tester:
         return [target, preds, word_grids, row_grids, target_cls, preds_cls, id2name]
 
     def calculate_grid_metric(self, preds, target, preds_cls, target_cls, word_grids, row_grids, dict_classes=None):
-        grid_metric = GridMetric()
-        
-        i = 0
-        N = len(preds)
-        for bboxes_pred, bboxes_true, grid_row, grid_word in zip(preds, target, row_grids, word_grids):
-            i += 1
-            try:
-                grid_metric.add_pair(bboxes_pred, bboxes_true, grid_row, grid_word)
-                print(f"{(i) / N * 100:4.2f} %", end='\r')
-            except:
-                pass
-        grid_metric.update()
-        cls_iougrid_row = classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids, dict_classes=dict_classes)
-        cls_iougrid_row["F1@IoUGrid[0.50] (all)"]= float(grid_metric.rez['threshold_05']['f1_row'])
-        cls_iougrid_row["F1@IoUGrid[0.95] (all)"]= float(grid_metric.rez['threshold_95']['f1_row'])
-        return cls_iougrid_row
-
-    def calculate_map_metric(self, preds, target):
-        map_metric = MeanAveragePrecision(box_format="xywh")
-
-        get_category = lambda an: 1
-
-        map_metric.update([dict(
-            boxes=torch.tensor(bboxes_pred),
-            scores=torch.tensor([1.0 for an in bboxes_pred]),
-            labels=torch.tensor([get_category(an) for an in bboxes_pred]),
-        ) for bboxes_pred in preds],
+        grid_metric = MultiGridMetric()
+        grid_metric.update(
             [dict(
-                boxes=torch.tensor(bboxes_true),
-                labels=torch.tensor([get_category(an) for an in bboxes_true]),
-            ) for bboxes_true in target])
-        rez = map_metric.compute()
+                boxes=b,
+                labels=cls
+            ) for b, cls in zip(preds, preds_cls)],
 
-        return {
-            "name": "mAP@IoU[0.50:0.95]",
-            "mAP (seg)": rez['map']
-        }
+            [dict(
+                boxes=b,
+                labels=cls
+            ) for b, cls in zip(target, target_cls)], 
+            word_grids, row_grids
+        )
+        rez = grid_metric.compute()
+        return rez
+
 
 
     def calculate_map_with_classes(self, preds, target, preds_cls, target_cls, dict_classes=None):
         map_metric = MeanAveragePrecision(box_format="xywh", class_metrics=True)
+        map_metric_seg = MeanAveragePrecision(box_format="xywh")
 
         map_metric.update(
             [dict(
@@ -199,17 +179,26 @@ class Tester:
                 labels=torch.tensor(cls)
             ) for b, cls in zip(target, target_cls)]
         )
-
         rez = map_metric.compute()
+
+        get_category = lambda an: 1
+        map_metric_seg.update([dict(
+            boxes=torch.tensor(bboxes_pred),
+            scores=torch.tensor([1.0 for an in bboxes_pred]),
+            labels=torch.tensor([get_category(an) for an in bboxes_pred]),
+        ) for bboxes_pred in preds],
+            [dict(
+                boxes=torch.tensor(bboxes_true),
+                labels=torch.tensor([get_category(an) for an in bboxes_true]),
+            ) for bboxes_true in target])
+        rez_seg = map_metric_seg.compute()
         
-        # lines = [f"mAP@IoU[0.50:0.95] (with classes): {rez['map']:.6f}"]
-        rez_segment = self.calculate_map_metric(preds,target)
         reg_classes = rez['classes']
         reg_per = rez['map_per_class']
         dict_rez = {
             "name": "mAP@IoU[0.50:0.95]",
             "mAP (all)": float(rez['map']),
-            "mAP (seg)": float(rez_segment['mAP (seg)'])
+            "mAP (seg)": float(rez_seg['map'])
         }
         for map_cls, cls in zip(reg_per, reg_classes):
             dict_rez[f"mAP ({int(cls)if dict_classes is None else dict_classes[int(cls)]})"] = float(map_cls)
