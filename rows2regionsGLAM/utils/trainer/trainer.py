@@ -6,23 +6,36 @@ import torch.nn as nn
 from ...models import get_loss, get_model
 from dotenv import load_dotenv
 
-env_file = os.path.join('..', '.env')
-load_dotenv(env_file)
+# env_file = os.path.join('..', '.env')
+# load_dotenv(env_file)
 
 class Trainer:
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
             self.loger = conf['loger']
-        if "params" not in conf.keys():
-            raise Exception('Создайте и передайте параметры "params"')
+            
+        if "train_param" not in conf.keys():
+            raise Exception('Создайте и передайте параметры "train_param"')
         else:
-            self.params = conf['params']
-        if "model_name" not in conf.keys():
-            raise Exception('Создайте и передайте название модели "model_name"')
+            self.train_param = conf['train_param']
+            
+        if "model" not in conf.keys():
+            raise Exception('Создайте и передайте модель "model"')
         else:
-            self.model_name = conf['model_name']
+            self.model = conf['model']
+            
+        if "dataset" not in conf.keys():
+            raise Exception('Создайте и передайте датасет "dataset"')
+        else:
+            self.dataset = conf['dataset']
+
+        if "loss" not in conf.keys():
+            raise Exception('Создайте и передайте loss function "loss"')
+        else:
+            self.loss = conf['loss']
+            
         self.loger.time_log()
         self.loger("Create Trainer")
         self.device = torch.device(os.environ.get('DEVICE', 'cpu'))
@@ -53,6 +66,11 @@ class Trainer:
             try:
                 if data_graph_dict is None:
                     continue
+                if len(data_graph_dict['X']) < 2:
+                    continue
+                if len(data_graph_dict['Y']) == 0:
+                    continue
+                
                 pred_graph_dict = model(data_graph_dict)
                 loss = criterion(pred_graph_dict, data_graph_dict)
                 my_loss_list.append(loss.item())
@@ -60,9 +78,9 @@ class Trainer:
             except Exception as e:
                 print(e)
                 if "Y" in data_graph_dict.keys():
-                    print(np.array(data_graph_dict['Y']).shape)
+                    print(np.array(data_graph_dict['Y'].cpu()).shape)
                 if "X" in data_graph_dict.keys():
-                    print(np.array(data_graph_dict['X']).shape)
+                    print(np.array(data_graph_dict['X'].cpu()).shape)
                 continue
             if train:  
                 loss.backward()
@@ -70,18 +88,28 @@ class Trainer:
             optimizer.step()
         return np.mean(my_loss_list)
 
-    def _train_model(self, model, dataset, criterion, save_frequency=5, start_epoch=0):  
+    def _train_model(self, save_frequency=5, start_epoch=0):  
+        model=self.model
+        dataset=self.dataset
+        criterion=self.loss
+        batch_size = self.train_param["batch_size"]
+        count_epochs = self.train_param["epochs"]
+        save_frequency = self.train_param['save_frequency']
+        restart_num = self.train_param['restart_num']
+        
+        start_epoch = 0 if restart_num is None else (restart_num+1)*save_frequency
+        
         optimizer = torch.optim.Adam(
         list(model.parameters()),
-        lr=self.params["learning_rate"],
+            lr=self.train_param["learning_rate"],
         )
         model.to(self.device)
         criterion.to(self.device)
 
         loss_list = []
         start = time.time()
-        train_dataset, val_dataset = self._split_index_train_val(dataset, val_split=0.1, batch_size=self.params["batch_size"])
-        for k in range(start_epoch, self.params["epochs"]):
+        train_dataset, val_dataset = self._split_index_train_val(dataset, val_split=0.1, batch_size=batch_size)
+        for k in range(start_epoch, count_epochs):
             my_loss_list = []
             if k == start_epoch:
                 start = time.time()
@@ -109,45 +137,17 @@ class Trainer:
             self.loger(f"EPOCH #{k}\t {train_val:.8f} (VAL: {validation_val:.8f})")  
             if (k+1) % save_frequency == 0:
                 num = k//save_frequency
-                torch.save(model.state_dict(), self.model_name+f"_tmp_{num}")
+                torch.save(model.state_dict(), self.model.path+f"_tmp_{num}")
         self.loger(f"Время обучения: {time.time()-start:.2f} сек")
-        torch.save(model.state_dict(), self.model_name)
-
-
-    def _load_checkpoint(self, model, path_model,restart_num=None):
-        dir_model = os.path.dirname(path_model)
-        name_model = os.path.basename(path_model)
-        names = [n for n in os.listdir(dir_model) if name_model+'_tmp_' in n]
-        if restart_num is None:
-            list_num = [int(n.split("_tmp_")[-1]) for n in names]
-            if len(list_num) == 0:
-                return
-            restart_num = max(list_num) 
-
-        checkpoint_path = os.path.join(dir_model, name_model+f"_tmp_{restart_num}")
-        model.load_state_dict(torch.load(checkpoint_path, weights_only=True))
-        print(checkpoint_path)
-        return restart_num
-
-    def start_train(self, save_frequency, dataset, is_restart = False, restart_num = None, type_model='base'):
-        if is_restart:
-            self.loger("R E S T A R T ")
-        self.loger.time_log()
-        try:
-            str_ = dataset.__str__()
-            str_ += '\n'.join(f"{key}:\t{val}" for key, val in self.params.items())
-            print(str_)
-            if not is_restart:
-                self.loger(str_)
-        except:
-            print(dataset)
-        self.params['sigmoidEdge'] = False
-       
-        criterion = get_loss(type_model, self.params['loss_params'])
-        model = get_model(type_model, self.params)
-
-        if is_restart:
-            restart_num = self._load_checkpoint(model, self.model_name)
         
-        start_epoch = 0 if restart_num is None else (restart_num+1)*save_frequency
-        self._train_model(model=model, dataset=dataset, criterion=criterion, save_frequency=save_frequency, start_epoch=start_epoch)
+
+    def start_train(self):
+        self.dataset.train()
+        self.loger.time_log()
+        str_ = self.dataset.__str__()
+        str_ += '\n'.join(f"{key}:\t{val}" for key, val in self.train_param.items())
+        print(str_)
+        self.loger(str_)
+       
+        
+        self._train_model()

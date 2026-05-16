@@ -10,6 +10,7 @@ env_file = os.path.join(PATH_PROJECT, '.env')
 load_dotenv(env_file)
 warnings.filterwarnings('ignore', message='Converting sparse tensor to CSR format')
 warnings.filterwarnings('ignore', message='Implicit dimension choice for softmax')
+warnings.filterwarnings('ignore', message='To copy construct from a tensor')
 
 from pager.page_model.sub_models import RegionModel, RowsModel
 
@@ -24,7 +25,7 @@ from rows2regionsGLAM.utils.tester import Tester
 from rows2regionsGLAM.models import get_loss, get_model, get_tmp_params
 from rows2regionsGLAM.utils.imbalance import calculate_imbalance
 from rows2regionsGLAM.converters import Rows2Regions
-from rows2regionsGLAM.tokenizers.font_tokenizer import RowGLAMTokenizer as fontTokenizer
+from rows2regionsGLAM.tokenizers.font_emb_tokenizer import RowGLAMTokenizer as fontTokenizer
 from rows2regionsGLAM.tokenizers import RowGLAMTokenizer as no_fontTokenizer
 
 
@@ -62,85 +63,76 @@ def fun_get_dataset_with_param(param):
         
 
 def fun_get_model_with_param(param):
-    type_model=param["type"]
     exist_font=param["exist_font"]
 
     
-    model_name = str(Path(exp_path, f'row2region_GLAM_{type_model}_{exist_font}'))
-    
-    if type_model == "base":
-        model_params = {
-            "edge_featch": 4,
-            "epochs": 30,
-            "batch_size": 128,
-            "learning_rate": 0.001,
-            "Tag":[{'in': -1, 'size': 512, 'out': 512, 'k': 3},
-                    {'in': 512, 'size': 256, 'out': 256, 'k': 3}],
-            "NodeLinear": [-1, 64, 32],
-            "NodeLinearClassifier": [-1, 16, 8],
-            "EdgeLinear": [-1, 16, 4],
-            "batchNormNode": True,
-            "batchNormEdge": True,
-            "seg_k": 0.5,
-            "loss_params": {
-                "edge_coef": 0.2,
-                "node_coef": 0.8,
+    model_name = str(Path(exp_path, f'row2region_GLAM_{exist_font}'))
+    input_x = 527 if exist_font=='font' else 15
+    model_params = {
+            "node_block": { # Первый слой содержит число features
+                "linear_pred": [
+                    {"in": input_x, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
+                ],
+                "gnn": [
+                    ("tag", {"batch_norm": True, "concat": True,
+                             "in":128,  "in_gnn":256, "out_gnn":128, 
+                             "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
+                    ("tag", {"batch_norm": False,"concat": True,
+                             "in":128+128, "in_gnn":256, "out_gnn":128, 
+                             "gnn_activation":"gelu", "activation":"gelu", "K":3}),
+                        ],
+                # "linear_post": [ # PRED похож на POST
+                #     {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                #     {"in": 256, "out": 128, "activation": "gelu"},
+                #     {"in": 128, "out": 32, "activation": "gelu"},
+                # ]
             },
-            "sigmoidEdge": False,
-            "NodeClasses": 6 # len(CLASSES)
-        }
-    elif type_model == "custom":
-        model_params  = {
-            "edge_featch": 4,
-            "learning_rate": 0.001,
-            "model_type" : 2,
-            "concat_gcn" : True,
-            "mlp_pred":[
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 128}],
-            "gcn_node":[
-                 {"linear_in" : -1, "linear_out" : 256, "batch_norm" : True,  "activation" : "gelu", "aggregation" : "tag", "K" : 3,  "size":128},
-                 {"linear_in" : -1, "linear_out" : 256, "batch_norm" : False, "activation" : "gelu", "aggregation" : "tag", "K" : 3,  "size":64}],
-            "mlp_node_class":[
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 128},
-                 {"in" : -1, "batch_norm" : False, "activation" : "softmax", "out" : 6}],
-            "mlp_node_pred":[
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 128}],
-            "gcn_node_post":[
-                 {"linear_in" : -1, "linear_out" : 256, "batch_norm" : True,  "activation" : "gelu", "aggregation" : "tag", "K" : 3,  "size":128},
-                 {"linear_in" : -1, "linear_out" : 256, "batch_norm" : False, "activation" : "gelu", "aggregation" : "tag", "K" : 3,  "size":128}],
-            "mlp_node_edge":[
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 128},
-                 {"in" : -1, "batch_norm" : False, "activation" : None,   "out" : 128}],
-            "mlp_edge_class":[
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 256},
-                 {"in" : -1, "batch_norm" : False, "activation" : "gelu", "out" : 64},
-                 {"in" : -1, "batch_norm" : False, "activation" : None,   "out" : 1}],
-            "seg_k": 0.5,
-            "loss_params": {
-                "edge_coef": 0.2,
-                "node_coef": 0.8,
+            "node_classifier_block": {
+                "linear_post": [ # Удобно задать MLP как только POST часть
+                    {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
+                    {"in": 128, "out": 6, "activation": "none"},
+                ]
             },
-            "sigmoidEdge": False,
+            "post_node_block": {
+                "linear_pred": [
+                    {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
+                ],
+                "gnn": [
+                    ("tag", {"batch_norm": True, "concat": True,
+                             "in":128,  "in_gnn":256, "out_gnn":128, 
+                             "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
+                    ("tag", {"batch_norm": False,"concat": True,
+                             "in":128+128, "in_gnn":256, "out_gnn":128, 
+                             "gnn_activation":"gelu", "activation":"gelu", "K":3}),
+                        ],
+                "linear_post": [ # PRED похож на POST
+                    {"in": 128+128+128, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 128, "activation": "gelu"},
+                    {"in": 128, "out": 128, "activation": "gelu"},
+                ]
+            }, # НЕ ОБЯЗАТЕЛЬНЫЙ
+            # "conjugate_edge_block": {}, # НЕ ОБЯЗАТЕЛЬНЫЙ
+            "edge_classifier_block": {
+                 "linear_post": [ # Удобно задать MLP как только POST часть
+                    {"in": 2*(128+input_x)+4, "out": 256, "activation": "gelu"},
+                    {"in": 256, "out": 64, "activation": "gelu"},
+                    {"in": 64, "out": 1, "activation": "none"},
+                ]
+            },
+            "epochs" : 30,
+            "batch_size"  : 64,
+            "learning_rate" : 0.001,
+            "seg_k"  : 0.5,
+            "loss_params" : {
+                "edge_coef": 0.8,
+                "node_coef": 0.2
+            }
         }
-    else:
-        raise Exception('неверная конфигурация')
-
-
-    if exist_font == 'font':
-        model_params["node_featch"] = 18
-    elif exist_font == 'no_font':
-        model_params["node_featch"] = 15
-    else:
-        raise Exception('неверная конфигурация')
     
-    model_params["NodeClasses"] = len(coco_manager_train.classes)
-    model_params["epochs"] = 10
-    model_params["batch_size"] = 64
     return {
          'model_name': model_name,
          'model_params': model_params
@@ -152,7 +144,6 @@ def fun_train_model_with_param(model, dataset, param):
     model_params = model['model_params']
 
     dataset = dataset['train']
-    type_model=param["type"]
 
     
     publaynet_imbalance, edge_imbalance = calculate_imbalance(dataset)
@@ -161,15 +152,16 @@ def fun_train_model_with_param(model, dataset, param):
     
     if not Path(model_name).exists():
         trainer_pub = Trainer(conf={"loger": loger, "params": model_params, "model_name": model_name})
-        trainer_pub.start_train(5, dataset, type_model=type_model)
+        trainer_pub.start_train(5, dataset, type_model='main')
     
 def fun_test_model_with_param(model, dataset, param):
     test_dataset = dataset['test']
-    type_model = param["type"]
     exist_font =  param['exist_font']
     model_name = model['model_name']
     model_params = model['model_params']
 
+    model_params['node_classifier_block']['linear_post'][-1]['activation'] = "softmax"
+    model_params['edge_classifier_block']['linear_post'][-1]['activation'] = "sigmoid"
     
     if exist_font == 'font':
         tokenizer = font_tokenizer
@@ -177,9 +169,8 @@ def fun_test_model_with_param(model, dataset, param):
         tokenizer = no_font_tokenizer
     else:
         raise Exception('неверная конфигурация')
-    
-    model_params['sigmoidEdge'] = True
-    model = get_model(type_model, model_params)
+
+    model = get_model('main', model_params)
     model.load_state_dict(torch.load(model_name, weights_only=True))
     
     rows_model = RowsModel()
@@ -214,7 +205,7 @@ if __name__ == "__main__":
     test_dataset_path = os.environ['TEST_PATH']
     test_dataset_coco = os.environ['TEST_COCO_PATH']
     
-    exp_path = 'test_path'
+    exp_path = 'result'
     exp = Experimenter(name='test', result_save_path=exp_path)
 
     loger = Loger()
@@ -223,14 +214,14 @@ if __name__ == "__main__":
     
     
     dict_params = {
-        exist_font+"_"+type_model: {
-            "model_param": {"type": type_model, 'exist_font': exist_font},
+        f'{exist_font}': { # _{num}
+            "model_param": {'exist_font': exist_font},
             "dataset_param": {"exist_font": exist_font},
-            "train_param": {"type": type_model},
-            "test_param": {"type": type_model, "exist_font": exist_font}
+            "train_param": {},
+            "test_param": { "exist_font": exist_font}
         }
     
-        for exist_font in ['no_font', 'font'] for type_model in ['base', 'custom']
+        for exist_font in ['font','no_font'] #for num in range(5)
     }
     font_tokenizer = fontTokenizer()
     no_font_tokenizer = no_fontTokenizer()

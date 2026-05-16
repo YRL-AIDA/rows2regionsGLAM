@@ -34,7 +34,6 @@ class COCOManager:
             name = im['file_name'][:-3]+'pdf'
             img_id = im['id']
             id_2_file[img_id] = name 
-            
         
         get_info = lambda an: {'segment': {
             'x_top_left': int(an['bbox'][0]),
@@ -64,9 +63,11 @@ class COCOManager:
     
     def __call__(self, name_pdf, page_info):
         if self.name_dataset == "doclaynet":
-            coef_w, coef_h = page_info['width'] / 1024, page_info['height'] / 1024
+            coef_w, coef_h = page_info['width'] / 1025, page_info['height'] / 1025
         elif self.name_dataset == "publaynet":
             coef_w, coef_h = 1, 1
+        else:
+            raise Exception(f"name error '{self.name_dataset}' ")
         
         regions = self.regions[name_pdf]['regions']
         

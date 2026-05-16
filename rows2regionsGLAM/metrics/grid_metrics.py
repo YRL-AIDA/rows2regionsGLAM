@@ -31,9 +31,9 @@ def grid_Precision_and_Recall(bboxes_pred:list[ImageSegment], bboxes_true:list[I
         num = (in_ip & in_it).sum()
         
         return 0.0 if dem == 0 else float(num/dem)
-        
+    
     res = [[(get_iou(it, ip), it) for it, _ in enumerate(bboxes_true)]  for ip, _ in enumerate(bboxes_pred)]
-    res = [sorted([r for r in p if p[0]>threshold], key=lambda r: r[0], reverse=True) for p in res]
+    res = [sorted([r for r in p if r[0]>threshold], key=lambda r: r[0], reverse=True) for p in res]
 
     t_no = []
     TP = 0
@@ -57,7 +57,7 @@ class MultiGridMetric:
 
     def update(self, preds_dicts, target_dicts, row_grids, word_grids):
         
-        labels = set([preds_dict['labels'] for preds_dict in preds_dicts]) | set([target_dict['labels'] for target_dict in target_dicts])
+        labels = set([label for preds_dict in preds_dicts for label in preds_dict['labels']]) | set([label for target_dict in target_dicts for label in target_dict['labels']])
         for label in labels:
             grid_metric = GridMetric()
             grid_metric.update(
@@ -72,7 +72,7 @@ class MultiGridMetric:
                 preds=[preds_dict['boxes'] for preds_dict in preds_dicts],
                 target=[target_dict['boxes'] for target_dict in target_dicts],
                 row_grids=row_grids, word_grids=word_grids
-            )
+        )
         self.grid_metrics['all'] = grid_metric
 
     def compute(self):
@@ -81,6 +81,7 @@ class MultiGridMetric:
             rez = grid_metric.compute()
             for th, metrics in rez.items():
                 rezs[f'{th} ({label})'] = metrics['f1_row']
+        return rezs
 
 class GridMetric:
     def __init__(self, box_format="xywh"):
@@ -144,8 +145,8 @@ class GridMetric:
                     for metric, ans in loc_th_rez.items():
                         th_rez["all_"+metric].append(ans)
                 print(f"{(i) / N * 100:4.2f} %", end='\r')
-            except:
-                pass
+            except Exception as e:
+                print(e)
         self.__update()
     
     def compute(self):
@@ -165,7 +166,6 @@ class GridMetric:
         else:
             precision_row, recall_row = grid_Precision_and_Recall(bboxes_pred, bboxes_true, grid_row, threshold)
             precision_word, recall_word = grid_Precision_and_Recall(bboxes_pred, bboxes_true, grid_word, threshold)
-
         return {
             "precision_row": precision_row,
             "recall_row": recall_row,

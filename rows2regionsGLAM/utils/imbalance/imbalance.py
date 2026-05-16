@@ -9,14 +9,14 @@ def _calculate_positiv_negativ(dataset):
     for g in dataset:
         if not "true_edges" in g or not "true_nodes" in g:
             continue
-        M = len(g['true_edges'])
-        p = sum(g['true_edges'])
+        M = len(g['true_edges'].cpu())
+        p = sum(g['true_edges'].cpu())
         n = M - p
         positiv.append(p)
         negativ.append(n)
 
         M = len(g['true_nodes'])
-        nodes = np.array(g['true_nodes'])
+        nodes = np.array(g['true_nodes'].cpu())
         pp = nodes.sum(axis=0)
         if type(pp) is np.float32:
             continue

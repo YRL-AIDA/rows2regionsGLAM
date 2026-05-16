@@ -240,7 +240,7 @@ if __name__ == "__main__":
 
     cache_pdf = os.environ["CASH_PDF_PATH"]
     
-    exp_path = 'test_path'
+    exp_path = 'result'
     exp = Experimenter(name='test', result_save_path=exp_path)
 
     loger = Loger()

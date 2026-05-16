@@ -8,22 +8,6 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 from rows2regionsGLAM.utils.tester.metrics_per_class import classification_metrics_iou, classification_metrics_grid
 
-DOC2PUB_MAP = {
-    'Text': 'text',
-    'Title': 'header',
-    'Section-header': 'header',
-    'List-item': 'list',
-    'Table': 'table',
-    'Picture': 'figure',
-    'Page-header': 'other',
-    'Page-footer': 'other',
-    'Caption': 'other',
-    'Footnote': 'other',
-    'Formula': 'other',
-    'other': 'other'
-}
-
-
 class Tester:
     def __init__(self, **conf):
         if "loger" not in conf.keys():
@@ -31,24 +15,19 @@ class Tester:
         else:
             self.loger = conf['loger']
 
-        if "pred" not in conf.keys():
-            raise Exception('Создайте и передайте predProcessor')
+        if "pipeline" not in conf.keys():
+            raise Exception('Создайте и передайте "Pipeline"')
         else:
-            self.pred = conf['pred']
-        if "rows_model" not in conf.keys():
+            self.pipeline = conf['pipeline']
+            
+        if "dataset" not in conf.keys():
             raise Exception('Создайте и передайте rows_model')
         else:
-            self.rows_model = conf['rows_model']
-        if "region_model" not in conf.keys():
-            raise Exception('Создайте и передайте region_model')
-        else:
-            self.region_model = conf['region_model']
-        if "rows2regions" not in conf.keys():
-            raise Exception('Создайте и передайте rows2regions')
-        else:
-            self.rows2regions = conf['rows2regions']
+            self.dataset = conf['dataset']
+            
         self.loger.time_log()
         self.loger("Create Tester")
+        self.data = None
 
     def get_bbox(self, segment, resize=None, delta_w=0, delta_h=0):
         coef_w, coef_h = 1, 1
@@ -86,12 +65,11 @@ class Tester:
         rows.clear()
         rows.extend(new_rows)
 
-    def clean_true_regions(self, true_regions):
-        return [reg for reg in true_regions if reg['segment']['height'] > 3 and reg['segment']['width'] > 3]
+   
 
 
 
-    def calculate_target_and_preds(self, test_dataset):
+    def calculate(self):
         target = []
         preds = []
         word_grids = []
@@ -99,50 +77,31 @@ class Tester:
         target_cls = []
         preds_cls = []
 
-        id2name = test_dataset.coco_manager.coco_classes
-        name2id = {name:id_ for id_, name in id2name.items()}
-        
-        N = len(test_dataset)
-        for i, d in enumerate(test_dataset):
-            name_file = test_dataset.pdf_names[i]
-            true_regions = test_dataset.coco_manager.regions[name_file]['regions']
-            clean_bboxes = self.clean_true_regions(true_regions)
-            bboxes_true =[reg['segment'] for reg in clean_bboxes]
-            classes_true = [reg['category_id'] for reg in clean_bboxes]
-            row_json, pdf_img = self.pred.get_json_and_img(test_dataset.pdf_dir/name_file)
-            row_json = row_json['rows']
-            self.rows_model.from_dict({"rows": row_json})
-           
+        id2name = self.dataset.coco_manager.coco_classes
+        self.dataset.test()
+        N = len(self.dataset)
+        for i, d in enumerate(self.dataset):
             try:
-                self.rows2regions.convert(self.rows_model, self.region_model, pdf_img)
-                pred_regions = self.region_model.to_dict()['regions']
-
-                # if name_dataset == "doclaynet" and name_test_dataset == "publaynet":
-                #     for r in pred_regions:
-                #         pub_label = DOC2PUB_MAP.get(r['label'], 'other')
-                #         r['label'] = pub_label
-                #     # pred_regions = aggregate_list_items(pred_regions)
-
-                filtered_preds = [r for r in pred_regions if r['label'] != 'other']
-
-                bboxes_pred = [r['segment'] for r in filtered_preds]
-                classes_pred = [name2id[r['label']] for r in filtered_preds]
-
-                # Очистка строк только для тестирования, в момент работы модели используются все строки, поскольку она училась на всех.
-                # self.clean_rows(row_json, bboxes_true)
+                bboxes_true  = d['bboxes_true']
+                classes_true = d['classes_true']
+                json_page = self.pipeline(d['path'])
+                row_json = [row for reg in json_page['regions'] for row in reg['rows']]
+                bboxes_pred =  [reg['segment'] for reg in json_page['regions']]
+                classes_pred = [reg['label'] for reg in json_page['regions']]
+                
                 word_grids.append([self.get_bbox(word['segment']) for row in row_json for word in row['words']])
-                row_grids.append([self.get_bbox(row['segment']) for row in row_json])
+                row_grids.append( [self.get_bbox(row['segment']) for row in row_json])
                 target.append([self.get_bbox(seg) for seg in bboxes_true])
                 preds.append([self.get_bbox(seg) for seg in bboxes_pred])
                 target_cls.append(classes_true)
                 preds_cls.append(classes_pred)
             except Exception as e:
                 print(e)
-                print(i,d["file_name"])
+                # print(i,d["file_name"])
 
             print(f"{(i + 1) / N * 100:4.2f} %", end='\r')
 
-        return [target, preds, word_grids, row_grids, target_cls, preds_cls, id2name]
+        self.data = [target, preds, word_grids, row_grids, target_cls, preds_cls, id2name]
 
     def calculate_grid_metric(self, preds, target, preds_cls, target_cls, word_grids, row_grids, dict_classes=None):
         grid_metric = MultiGridMetric()
@@ -218,8 +177,8 @@ class Tester:
         self.loger(grid_cls)
 
 
-    def get_results(self, metrics):
-        target, preds, word_grids, row_grids, target_cls, preds_cls, id2name = metrics
+    def get_results(self):
+        target, preds, word_grids, row_grids, target_cls, preds_cls, id2name = self.data
         map_cls = self.calculate_map_with_classes(preds, target, preds_cls, target_cls, dict_classes=id2name)
         grid_cls = self.calculate_grid_metric(preds, target, preds_cls, target_cls, word_grids, row_grids, dict_classes=id2name)
         return  grid_cls, map_cls
