@@ -36,12 +36,12 @@ class Ploter:
             resize = (1, 1) 
         def get_coords(vec):
             rw, rh = resize
-            x0 = vec[dict_features['x_top_left'][0]]
-            x1 = vec[dict_features['x_bottom_right'][0]]
-            y0 = vec[dict_features['y_top_left'][0]]
-            y1 = vec[dict_features['y_bottom_right'][0]]
-            h = vec[dict_features['height'][0]]
-            w = vec[dict_features['width'][0]]
+            x0 = vec[dict_features['x_top_left'][0]].cpu()
+            x1 = vec[dict_features['x_bottom_right'][0]].cpu()
+            y0 = vec[dict_features['y_top_left'][0]].cpu()
+            y1 = vec[dict_features['y_bottom_right'][0]].cpu()
+            h = vec[dict_features['height'][0]].cpu()
+            w = vec[dict_features['width'][0]].cpu()
             return x0*rw, x1*rw, w*rw, y0*rh, y1*rh, h*rh
 
         ax = plt.gca()
@@ -61,7 +61,7 @@ class Ploter:
         ]
 
         if markup:
-            inds= [int(np.argmax(e)) for e in torch_dict['true_nodes']]
+            inds= [int(np.argmax(e.cpu())) for e in torch_dict['true_nodes']]
         else:
             inds= [3 for _ in torch_dict["X"]]
         for vec, ind in zip(torch_dict["X"], inds):
