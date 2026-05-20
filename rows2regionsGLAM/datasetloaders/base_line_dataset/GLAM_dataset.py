@@ -228,12 +228,18 @@ class GLAMDataset(Dataset):
         name_file = self.pdf_names[idx]
         rez  = self.pred(self.pdf_dir/name_file)
         true_regions, classes_true = self.coco_manager(name_file, rez['pdf_json'])
-        clean_bboxes = self._clean_true_regions(true_regions)
+        clean_bboxes, classes_true = self._clean_true_regions(true_regions, classes_true)
         bboxes_true =[reg.get_segment_p_size() for reg in clean_bboxes]
         return bboxes_true, classes_true
 
-    def _clean_true_regions(self, true_regions):
-        return [reg for reg in true_regions if reg.height > 3 and reg.width > 3]
+    def _clean_true_regions(self, true_regions, true_classes):
+        clean_bboxes = []
+        classes_true = []
+        for cl, reg in zip(true_classes, true_regions):
+            if reg.height > 3 and reg.width > 3:
+                clean_bboxes.append(reg)
+                classes_true.append(cl)
+        return clean_bboxes, classes_true
 
     def init(self):
         N = self.count

@@ -88,13 +88,18 @@ class Tester:
                 row_json = [row for reg in json_page['regions'] for row in reg['rows']]
                 bboxes_pred =  [reg['segment'] for reg in json_page['regions']]
                 classes_pred = [reg['label'] for reg in json_page['regions']]
+                word_grids_ = [self.get_bbox(word['segment']) for row in row_json for word in row['words']]
+                row_grids_ = [self.get_bbox(row['segment']) for row in row_json]
+                target_ = [self.get_bbox(seg) for seg in bboxes_true]
+                preds_ = [self.get_bbox(seg) for seg in bboxes_pred]
                 
-                word_grids.append([self.get_bbox(word['segment']) for row in row_json for word in row['words']])
-                row_grids.append( [self.get_bbox(row['segment']) for row in row_json])
-                target.append([self.get_bbox(seg) for seg in bboxes_true])
-                preds.append([self.get_bbox(seg) for seg in bboxes_pred])
+                word_grids.append(word_grids_)
+                row_grids.append(row_grids_)
+                target.append(target_)
+                preds.append(preds_)
                 target_cls.append(classes_true)
                 preds_cls.append(classes_pred)
+                
             except Exception as e:
                 print(e)
                 # print(i,d["file_name"])

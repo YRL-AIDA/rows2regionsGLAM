@@ -67,16 +67,17 @@ BASE_PARAMS = {
                     {"in": 64, "out": 1, "activation": "none"},
                 ]
             },
-            "epochs" : 10,
+            "epochs" : 20,
             "batch_size"  : 64,
             "learning_rate" : 0.001,
             "seg_k"  : 0.5,
+            "save_frequency": 5,
             "loss_params" : {
                 "edge_coef": 0.8,
                 "node_coef": 0.2
-            }
+            },
+            
         }
-
 
 
 if __name__ == "__main__":
@@ -92,6 +93,6 @@ if __name__ == "__main__":
     start_experiments(
         {f"ed_coef{ed:5.2f}": get_exp(ed)
             # for ed in [0.0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0]
-            for ed in [0.2, 0.5, 0.8]
+            for ed in [0.0, 0.2, 0.5, 0.8, 1.0]
         }
     ) 
