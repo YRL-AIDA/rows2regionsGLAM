@@ -87,7 +87,10 @@ if __name__ == "__main__":
             "loss_params" : {
                 "edge_coef": 0.8,
                 "node_coef": 0.2
-            }
+            }, 
+            "save_frequency":10,
+            "restart_num":None
+
         }
 
         return params
@@ -97,7 +100,7 @@ if __name__ == "__main__":
     exps = list(itertools.product(coefs_class, coefs_gnn))
     print(exps)
     start_experiments(
-        {f"mlp*{coef_mlp} gnn*{coef_gnn}": get_exp(coef_mlp, coef_gnn)
+        {f"mlp*{coef_mlp} gnn*{coef_gnn}": get_exp(coef_gnn, coef_mlp)
             for coef_mlp, coef_gnn in exps
         }
     ) 
