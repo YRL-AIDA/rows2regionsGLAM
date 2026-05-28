@@ -89,18 +89,22 @@ if __name__ == "__main__":
                 "node_coef": 0.2
             }, 
             "save_frequency":10,
-            "restart_num":None
+            "restart_num":3
 
         }
 
         return params
-        
-    coefs_class = [0.25, 0.5, 1, 2, 4]
-    coefs_gnn = [0.25, 0.5, 1, 2, 4]
+    # Эксперимент 2   
+    # coefs_class = [1]
+    # coefs_gnn = [8, 12, 16]
+
+    # Эксперимент 3
+    coefs_class = [1]
+    coefs_gnn = [4, 8, 12, 16]
     exps = list(itertools.product(coefs_class, coefs_gnn))
     print(exps)
     start_experiments(
-        {f"mlp*{coef_mlp} gnn*{coef_gnn}": get_exp(coef_gnn, coef_mlp)
+        {f"mlp {coef_mlp} gnn{coef_gnn}": get_exp(coef_gnn, coef_mlp)
             for coef_mlp, coef_gnn in exps
         }
     ) 
