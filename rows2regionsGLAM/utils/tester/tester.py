@@ -147,14 +147,14 @@ class Tester:
 
         get_category = lambda an: 1
         map_metric_seg.update([dict(
-            boxes=torch.tensor(bboxes_pred),
-            scores=torch.tensor([1.0 for an in bboxes_pred]),
-            labels=torch.tensor([get_category(an) for an in bboxes_pred]),
-        ) for bboxes_pred in preds],
+            boxes=torch.tensor([b for b, l in zip(bboxes_pred, cls_pred) if l != 0]),
+            scores=torch.tensor([1.0 for b, l in zip(bboxes_pred, cls_pred) if l != 0]),
+            labels=torch.tensor([get_category(an) for an in [b for b, l in zip(bboxes_pred, cls_pred) if l != 0]]),
+        ) for bboxes_pred, cls_pred in zip(preds, preds_cls)],
             [dict(
-                boxes=torch.tensor(bboxes_true),
-                labels=torch.tensor([get_category(an) for an in bboxes_true]),
-            ) for bboxes_true in target])
+                boxes=torch.tensor([b for b, l in zip(bboxes_true, cls_true) if l != 0]),
+                labels=torch.tensor([get_category(an) for an in [b for b, l in zip(bboxes_true, cls_true) if l != 0]]),
+            ) for bboxes_true, cls_true in zip(target, target_cls)])
         rez_seg = map_metric_seg.compute()
         
         reg_classes = rez.get('classes', [])
