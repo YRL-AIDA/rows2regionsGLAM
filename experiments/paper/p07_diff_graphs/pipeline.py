@@ -36,8 +36,14 @@ def get_tokenizer(name_tok):
         return AllRowGLAMTokenizer()
 
 
+def _make_debug_int(val):
+    if val is None:
+        return 0
+    return int(val)
+
+
 class DiffGraphsPipeline:
-    def __init__(self, pred, model, dataset_name2id, model_id2name, coco_manager, default_index, num_classes):
+    def __init__(self, pred, model, dataset_name2id, model_id2name, coco_manager, default_index, num_classes, debug_render_dir=None):
         from rows2regionsGLAM.pipeline.converters import Rows2Regions
 
         self.pred = pred
@@ -46,6 +52,7 @@ class DiffGraphsPipeline:
         self.default_index = default_index
         self.num_classes = num_classes
         self.name2id = dataset_name2id
+        self.debug_render_dir = debug_render_dir
         self.rows2regions = Rows2Regions({
             "model": model,
             "tokenizer": pred.tokenizer,
@@ -86,7 +93,13 @@ class DiffGraphsPipeline:
             d = r.to_dict()
             d['label'] = d['data']['label']
             regs.append(d)
-        return {"regions": regs}
+
+        result = {"regions": regs}
+
+        if self.debug_render_dir:
+            self._debug_render(path, result, rez, pdf_json, true_regions, true_categories, true_edges)
+
+        return result
 
     def _get_annotations(self, name_pdf, page_info):
         try:
@@ -137,3 +150,33 @@ class DiffGraphsPipeline:
         true_edges = [is_one_region(nums_regions[i], nums_regions[j]) for i, j in zip(A[0], A[1])]
         true_nodes = [get_category(row_seg, region_segs, region_categories) for row_seg in row_segments]
         return true_edges, true_nodes
+
+    def _debug_render(self, path, result, rez, pdf_json, true_regions, true_categories, true_edges):
+        from rows2regionsGLAM.utils.ploter import render_page_from_pipeline
+
+        rez_copy = dict(rez)
+        rez_copy["regions"] = result["regions"]
+        rez_copy["torch_dict"] = dict(rez["torch_dict"])
+        rez_copy["torch_dict"]["true_edges"] = [_make_debug_int(e) for e in true_edges]
+
+        total_edges = len(true_edges)
+        positive_edges = sum(1 for e in true_edges if e == 1)
+        metrics = {
+            "rows": len(pdf_json.get("rows", [])),
+            "regions_true": len(true_regions),
+            "regions_pred": len(result["regions"]),
+            "edges_total": total_edges,
+            "edges_+": positive_edges,
+        }
+
+        render_page_from_pipeline(
+            rez=rez_copy,
+            pdf_json=pdf_json,
+            img=rez["img"],
+            true_regions=true_regions if isinstance(true_regions, list) else [],
+            true_categories=true_categories if isinstance(true_categories, list) else [],
+            save_dir=self.debug_render_dir,
+            page_name=path.name,
+            metrics=metrics,
+            id2name={v: k for k, v in self.name2id.items()},
+        )

@@ -92,6 +92,7 @@ def default_arch(
 
     if has_post_node:
         post_concat_in = concat_node_out
+        post_gnn_out = hidden_dim + num_layers * hidden_dim
         post_gnn = tag_gnn(hidden_dim, num_layers, hidden_dim=hidden_dim, gnn_hidden=gnn_hidden, gnn_type=gnn_type)
         params["post_node_block"] = {
             "linear_pred": [
@@ -101,7 +102,7 @@ def default_arch(
             ],
             "gnn": post_gnn,
             "linear_post": [
-                {"in": post_concat_in, "out": 256, "activation": "gelu"},
+                {"in": post_gnn_out, "out": 256, "activation": "gelu"},
                 {"in": 256, "out": hidden_dim, "activation": "gelu"},
                 {"in": hidden_dim, "out": hidden_dim, "activation": "gelu"},
             ],

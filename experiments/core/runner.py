@@ -61,7 +61,8 @@ class ExperimentRunner:
     def _run_one(self, name, model_params):
         datasets = self._load_datasets(name, model_params)
         model_info = self._build_model(name, model_params)
-        self._train(model_info, datasets["train"], model_params)
+        if "model_params" in model_info:
+            self._train(model_info, datasets["train"], model_params)
         result = self._test(name, model_info, datasets, model_params)
         return result
 
