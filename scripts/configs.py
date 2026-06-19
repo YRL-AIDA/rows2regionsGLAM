@@ -1,44 +1,30 @@
-DEBUG_CONFIG = {
-    'DEVICE': 'cpu',
-    'ROW_GLAM_TYPE': 'main',
-    'NAME_DATASET': 'publaynet',
-    'NAME_TEST_DATASET': 'publaynet',
-    'DATASET_PATH': 'debug_data/pdfs',
-    'COCO_PATH': 'debug_data/publaynet_mini.json',
-    'TEST_PATH': 'debug_data/pdfs',
-    'TEST_COCO_PATH': 'debug_data/publaynet_mini.json',
-    'CASH_PDF_PATH': 'debug_data/cache',
-    'EPOCHS': 2,
+import os
+from pathlib import Path
+from dotenv import dotenv_values
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+ENV_TEMPLATES = {
+    'debug': '.env.debug',
+    'local': '.env.local',
+    'server': '.env.server',
 }
 
-LOCAL_CONFIG = {
-    'DEVICE': 'cpu',
-    'ROW_GLAM_TYPE': 'main',
-    'NAME_DATASET': 'publaynet',
-    'NAME_TEST_DATASET': 'doclaynet',
-    'DATASET_PATH': '/Users/macbookair/Downloads/micro_publaynet/pdfs/train',
-    'COCO_PATH': '/Users/macbookair/Downloads/micro_publaynet/publaynet/train.json',
-    'TEST_PATH': '/Users/macbookair/Downloads/micro_publaynet/pdfs/dev',
-    'TEST_COCO_PATH': '/Users/macbookair/Downloads/micro_publaynet/publaynet/val.json',
-    'CASH_PDF_PATH': '/Users/macbookair/Downloads/micro_publaynet/tmp/cache_miner',
-    'EPOCHS': 30,
-}
 
-SERVER_CONFIG = {
-    'DEVICE': 'cuda',
-    'ROW_GLAM_TYPE': 'main',
-    'NAME_DATASET': 'publaynet',
-    'NAME_TEST_DATASET': 'publaynet',
-    'DATASET_PATH': '/home/daniil/disk01_1TB/datasets/publaynet_pdfs/pdfs/train',
-    'COCO_PATH': '/home/daniil/disk01_1TB/datasets/publaynet/train.json',
-    'TEST_PATH': '/home/daniil/disk01_1TB/datasets/publaynet_pdfs/pdfs/dev',
-    'TEST_COCO_PATH': '/home/daniil/disk01_1TB/datasets/publaynet/val.json',
-    'CASH_PDF_PATH': '/home/daniil/disk01_1TB/datasets/tmp/cache_miner_publaynet',
-    'EPOCHS': 30,
-}
+def resolve_env_file(env_arg):
+    if env_arg in ENV_TEMPLATES:
+        path = PROJECT_ROOT / ENV_TEMPLATES[env_arg]
+    else:
+        path = Path(env_arg)
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+    if not path.exists():
+        raise FileNotFoundError(f'Env file not found: {path}')
+    return path
 
-ALL_CONFIGS = {
-    'debug': DEBUG_CONFIG,
-    'local': LOCAL_CONFIG,
-    'server': SERVER_CONFIG,
-}
+
+def write_dotenv(env_path):
+    dest = PROJECT_ROOT / '.env'
+    with open(env_path) as src, open(dest, 'w') as dst:
+        dst.write(src.read())
+    return dest
