@@ -28,6 +28,7 @@ from rows2regionsGLAM.converters import Rows2Regions
 from rows2regionsGLAM.tokenizers.font_emb_tokenizer import RowGLAMTokenizer as fontTokenizer
 from rows2regionsGLAM.tokenizers import RowGLAMTokenizer as no_fontTokenizer
 
+EPOCHS = int(os.environ.get('EPOCHS', '30'))
 
 
 def fun_get_dataset_with_param(param):
@@ -123,7 +124,7 @@ def fun_get_model_with_param(param):
                     {"in": 64, "out": 1, "activation": "none"},
                 ]
             },
-            "epochs" : 30,
+            "epochs" : EPOCHS,
             "batch_size"  : 64,
             "learning_rate" : 0.001,
             "seg_k"  : 0.5,

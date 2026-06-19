@@ -10,7 +10,9 @@ env_file = os.path.join(PATH_PROJECT, '.env')
 load_dotenv(env_file)
 warnings.filterwarnings('ignore', message='Converting sparse tensor to CSR format')
 warnings.filterwarnings('ignore', message='Implicit dimension choice for softmax')
-from utils import start_experiments 
+from utils import start_experiments
+
+EPOCHS = int(os.environ.get('EPOCHS', '30'))
 
 BASE_PARAMS = {
             "node_block": { # Первый слой содержит число features
@@ -67,7 +69,7 @@ BASE_PARAMS = {
                     {"in": 64, "out": 1, "activation": "none"},
                 ]
             },
-            "epochs" : 10,
+            "epochs" : EPOCHS,
             "batch_size"  : 64,
             "learning_rate" : 0.001,
             "seg_k"  : 0.5,

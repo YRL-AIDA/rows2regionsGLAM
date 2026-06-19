@@ -1,25 +1,20 @@
 BASE_PARAMS = {
-        "node_block": { # Первый слой содержит число features
+        "node_block": {
             "linear_pred": [
                 {"in": 15, "out": 256, "activation": "gelu"},
                 {"in": 256, "out": 128, "activation": "gelu"},
             ],
             "gnn": [
                 ("tag", {"batch_norm": True, "concat": True,
-                         "in":128,  "in_gnn":256, "out_gnn":128, 
-                         "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
+                         "in":128,  "in_gnn":256, "out_gnn":128,
+                         "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                 ("tag", {"batch_norm": False,"concat": True,
-                         "in":128+128, "in_gnn":256, "out_gnn":128, 
+                         "in":128+128, "in_gnn":256, "out_gnn":128,
                          "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                     ],
-            # "linear_post": [ # PRED похож на POST
-            #     {"in": 128+128+128, "out": 256, "activation": "gelu"},
-            #     {"in": 256, "out": 128, "activation": "gelu"},
-            #     {"in": 128, "out": 32, "activation": "gelu"},
-            # ]
         },
         "node_classifier_block": {
-            "linear_post": [ # Удобно задать MLP как только POST часть
+            "linear_post": [
                 {"in": 128+128+128, "out": 256, "activation": "gelu"},
                 {"in": 256, "out": 128, "activation": "gelu"},
                 {"in": 128, "out": 6, "activation": "none"},
@@ -33,28 +28,27 @@ BASE_PARAMS = {
             ],
             "gnn": [
                 ("tag", {"batch_norm": True, "concat": True,
-                         "in":128,  "in_gnn":256, "out_gnn":128, 
-                         "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
+                         "in":128,  "in_gnn":256, "out_gnn":128,
+                         "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                 ("tag", {"batch_norm": False,"concat": True,
-                         "in":128+128, "in_gnn":256, "out_gnn":128, 
+                         "in":128+128, "in_gnn":256, "out_gnn":128,
                          "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                     ],
-            "linear_post": [ # PRED похож на POST
+            "linear_post": [
                 {"in": 128+128+128, "out": 256, "activation": "gelu"},
                 {"in": 256, "out": 128, "activation": "gelu"},
                 {"in": 128, "out": 128, "activation": "gelu"},
             ]
-        }, # НЕ ОБЯЗАТЕЛЬНЫЙ
-        # "conjugate_edge_block": {}, # НЕ ОБЯЗАТЕЛЬНЫЙ
+        },
         "edge_classifier_block": {
-             "linear_post": [ # Удобно задать MLP как только POST часть
+             "linear_post": [
                 {"in": 2*(128+15)+4, "out": 256, "activation": "gelu"},
                 {"in": 256, "out": 64, "activation": "gelu"},
                 {"in": 64, "out": 1, "activation": "none"},
             ]
         },
         "save_frequency": 10,
-        "epochs" : 10,
+        "epochs" : EPOCHS,
         "batch_size"  : 128,
         "learning_rate" : 0.001,
         "seg_k"  : 0.5,
@@ -77,6 +71,9 @@ from dotenv import load_dotenv
 sys.path.append(os.path.join('..', '..'))
 env_file = os.path.join('..', '..', '.env')
 load_dotenv(env_file)
+
+EPOCHS = int(os.environ.get('EPOCHS', '30'))
+
 ds_path = Path('/home/daniil/disk01_1TB/datasets/')
 # Кеш----------------------------------------------------------------------------
 # doclaynet_cash_pdf_path = os.environ['DOCLAYNET_CASH_PDF_PATH']

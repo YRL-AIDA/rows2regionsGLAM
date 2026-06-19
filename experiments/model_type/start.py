@@ -26,6 +26,8 @@ from rows2regionsGLAM.utils.imbalance import calculate_imbalance
 from rows2regionsGLAM.converters import Rows2Regions
 from rows2regionsGLAM.tokenizers import RowGLAMTokenizer
 
+EPOCHS = int(os.environ.get('EPOCHS', '30'))
+
 def fun_get_dataset_with_param(param):  
     train_dataset = GLAMDataset(coco_manager=coco_manager_train, default_index=0, pred=pred_train,
                           loger=loger, cache_dir=cache_pdf, pdf_dir=train_dataset_path)
@@ -162,7 +164,7 @@ def fun_get_model_with_param(param):
     else:
         raise Exception('неверная конфигурация')
 
-    model_params["epochs"] = 10
+    model_params["epochs"] = EPOCHS
     model_params["batch_size"] = 64
     model_params["learning_rate"]=0.001
     model_params["seg_k"] = 0.5,
