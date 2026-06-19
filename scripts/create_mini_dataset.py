@@ -27,8 +27,10 @@ def create_mini_dataset(coco_path, pdf_dir, output_dir, n_files=10, seed=42):
     selected_ids = {img['id'] for img in selected}
 
     for img in selected:
-        src = Path(pdf_dir) / img['file_name']
-        dst = pdf_out / img['file_name']
+        jpg_name = img['file_name']
+        pdf_name = jpg_name[:-3] + 'pdf' if jpg_name.endswith('.jpg') else jpg_name
+        src = Path(pdf_dir) / pdf_name
+        dst = pdf_out / pdf_name
         shutil.copy2(src, dst)
         mini_images.append(img)
 
