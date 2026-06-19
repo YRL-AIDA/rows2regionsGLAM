@@ -94,7 +94,7 @@ class Trainer:
         criterion=self.loss
         batch_size = self.train_param["batch_size"]
         count_epochs = self.train_param["epochs"]
-        save_frequency = self.train_param['save_frequency']
+        save_frequency = self.train_param.get('save_frequency', 5)
         restart_num = self.train_param['restart_num']
         
         start_epoch = 0 if restart_num is None else (restart_num+1)*save_frequency

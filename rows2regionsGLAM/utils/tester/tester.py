@@ -2,7 +2,7 @@ import sys
 import os
 import torch
 import numpy as np
-from pager import ImageSegment
+from pagerlib.dtypes import ImageSegment
 from rows2regionsGLAM.metrics import MultiGridMetric
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
@@ -56,7 +56,7 @@ class Tester:
             return h > 3 and w > 3
 
         old_rows = [row for row in rows if is_good_block(row)]
-        segs_row = [ImageSegment(dict_2p=row['segment']) for row in old_rows]
+        segs_row = [ImageSegment(dict_p_size=row['segment']) for row in old_rows]
         new_rows = []
         seg_bboxes_true = [ImageSegment(dict_p_size=bbox) for bbox in bboxes_true]
         for i, row in enumerate(segs_row):
@@ -157,8 +157,8 @@ class Tester:
             ) for bboxes_true in target])
         rez_seg = map_metric_seg.compute()
         
-        reg_classes = rez['classes']
-        reg_per = rez['map_per_class']
+        reg_classes = rez.get('classes', [])
+        reg_per = rez.get('map_per_class', [])
         dict_rez = {
             "name": "mAP@IoU[0.50:0.95]",
             "mAP (all)": float(rez['map']),

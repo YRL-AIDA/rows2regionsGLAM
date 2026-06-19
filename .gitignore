@@ -218,3 +218,5 @@ notebooks/*
 !notebooks/*.ipynb
 **/result/
 !**/result/results.csv
+
+tmp_feature_*/

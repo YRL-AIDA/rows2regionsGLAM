@@ -1,5 +1,6 @@
 from ..base_line_tokenizer import RowGLAMTokenizer as BaseLineTokenizer
-from pager.page_model.sub_models.dtype import ImageSegment, Font
+from pagerlib.dtypes import ImageSegment
+from pagerlib.dtypes.physical_elements.font import Font
 from typing import Dict, List
 import numpy as np
 import cv2
@@ -43,7 +44,7 @@ class RowGLAMTokenizer(BaseLineTokenizer):
         return nodes_feature.tolist()
     
     def get_vec_font(self, row, pdf_img):
-        seg = ImageSegment(dict_2p=row['segment'])
+        seg = ImageSegment(dict_p_size=row['segment'])
         row_img = seg.get_segment_from_img(pdf_img)
         row_cv2 = cv2.cvtColor(row_img, cv2.COLOR_RGB2GRAY)
         pil_image = Image.fromarray(row_cv2)

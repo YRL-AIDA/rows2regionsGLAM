@@ -1,4 +1,4 @@
-from pager.page_model.sub_models.dtype import ImageSegment
+from pagerlib.dtypes import ImageSegment
 from typing import List
 import numpy as np
 

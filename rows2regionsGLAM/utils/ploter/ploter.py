@@ -1,5 +1,5 @@
-from pager import RowsModel, RegionModel, ImageModel
-from pager.page_model.sub_models.dtype import Row, ImageSegment
+from rows2regionsGLAM._page_model import RowsModel, RegionModel, ImageModel
+from rows2regionsGLAM._row_compat import Row, ImageSegment
 from ...tokenizers import BaseTokenizer
 import numpy as np
 import matplotlib.pyplot as plt

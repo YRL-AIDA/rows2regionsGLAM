@@ -4,7 +4,7 @@ from ..utils.pdf_manager import PDFManager
 from ..utils.row_manager import RowManager
 from ..utils.intersect_util import get_num_regions_of_rows
 from ..tokenizers import RowGLAMTokenizer
-from pager.page_model.sub_models.dtype import ImageSegment
+from pagerlib.dtypes import ImageSegment
 
 
 class PredProcessor:

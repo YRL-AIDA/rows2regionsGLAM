@@ -1,4 +1,4 @@
-from pager import Row, ImageSegment
+from rows2regionsGLAM._row_compat import Row, ImageSegment
 
 import numpy as np
 class RowManager:

@@ -1,4 +1,4 @@
-from pager.page_model.sub_models import RegionModel, RowsModel
+from rows2regionsGLAM._page_model import RegionModel, RowsModel
 from .converters import Rows2Regions
 
  
@@ -28,8 +28,11 @@ class Pipeline:
         self.rows2regions.convert(self.rows_model, self.region_model, pdf_img)
         pred_regions = self.region_model.to_dict()['regions']
         def name2id(r):
-            r['label'] = self.name2id[r['label']]
-            return r
+            label = r.data['label']
+            r.data['label'] = self.name2id[label]
+            d = r.to_dict()
+            d['label'] = d['data']['label']
+            return d
             
         filtered_preds = [name2id(r) for r in pred_regions]
         return {

@@ -77,7 +77,7 @@ from rows2regionsGLAM.metrics.grid_metrics import gridIoU
 
 def classification_metrics_grid(preds, target, preds_cls, target_cls, row_grids, thresholds=(0.5, 0.95), dict_classes=None):
     from collections import defaultdict
-    from pager import ImageSegment
+    from pagerlib.dtypes import ImageSegment
 
     all_classes = [id_ for id_, name in dict_classes.items()]
 

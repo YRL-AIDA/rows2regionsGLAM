@@ -1,4 +1,4 @@
-from pager import ImageSegment
+from pagerlib.dtypes import ImageSegment
 import numpy as np
 from ..utils.intersect_util import get_num_regions_of_rows
 def gridIoU(bbox_1:ImageSegment, bbox_2:ImageSegment, grid_blocks:list[ImageSegment]):

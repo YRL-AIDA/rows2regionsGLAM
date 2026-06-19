@@ -1,7 +1,7 @@
 
 from ..graph_creater import graph_creat
 from ..base_tokenizer import BaseTokenizer
-from pager.page_model.sub_models.dtype import ImageSegment
+from pagerlib.dtypes import ImageSegment
 import torch
 import re
 import numpy as np
@@ -24,7 +24,7 @@ class RowGLAMTokenizer(BaseTokenizer):
 
     def get_A(self, rows_json):
         
-        edges = graph_creat([ImageSegment(dict_2p=row_json['segment']) for row_json in rows_json])
+        edges = graph_creat([ImageSegment(dict_p_size=row_json['segment']) for row_json in rows_json])
 
         A1, A2 = [], []
         for a1, a2 in edges:
@@ -39,7 +39,7 @@ class RowGLAMTokenizer(BaseTokenizer):
     def get_node_features(self, rows_json, pdf_img):
         if len(rows_json) == 0:
             return [[]]
-        rows_texts = [r['text'] for r in rows_json]
+        rows_texts = [(r.get('text') or (r.get('data') or {}).get('text', '')) for r in rows_json]
         dot_vec = np.array([[1.0 if dot in r else 0.0 for dot in (".", ",", ";", ":")] for r in rows_texts])
         
         list_ind_vec = np.array([self.get_vec_list(r) for r in rows_texts])
@@ -67,8 +67,8 @@ class RowGLAMTokenizer(BaseTokenizer):
     def get_edge_features(self, A, rows_json, pdf_img):
         edges_featch = []
         for i, j in zip(A[0], A[1]):
-            r1 = ImageSegment(dict_2p= rows_json[i]['segment'])
-            r2 = ImageSegment(dict_2p= rows_json[j]['segment'])
+            r1 = ImageSegment(dict_p_size= rows_json[i]['segment'])
+            r2 = ImageSegment(dict_p_size= rows_json[j]['segment'])
             x1, y1 = r1.get_center()
             x2, y2 = r2.get_center()
 
@@ -99,11 +99,11 @@ class RowGLAMTokenizer(BaseTokenizer):
         }
     
     def get_vec_heuristics(self, row):
-        text = row['text']
+        text = row.get('text') or (row.get('data') or {}).get('text', '')
         text_size = len(text)
         if text_size == 0:
             return [0, 0]
-        seg = ImageSegment(dict_2p=row['segment'])
+        seg = ImageSegment(dict_p_size=row['segment'])
         m = seg.width/seg.height
         digit_count = sum(char.isdigit() for char in text)
         return [text_size/m, digit_count/text_size]
@@ -153,5 +153,5 @@ class RowGLAMTokenizer(BaseTokenizer):
         return [list_mark]
 
     def get_vec_coord(self, row_json):
-        seg = ImageSegment(dict_2p=row_json['segment'])
+        seg = ImageSegment(dict_p_size=row_json['segment'])
         return [seg.x_top_left, seg.x_bottom_right, seg.width, seg.y_top_left, seg.y_bottom_right, seg.height]

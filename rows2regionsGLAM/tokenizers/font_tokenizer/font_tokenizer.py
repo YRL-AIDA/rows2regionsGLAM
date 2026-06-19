@@ -1,5 +1,6 @@
 from ..base_line_tokenizer import RowGLAMTokenizer as BaseLineTokenizer
-from pager.page_model.sub_models.dtype import ImageSegment, Font
+from pagerlib.dtypes import ImageSegment
+from pagerlib.dtypes.physical_elements.font import Font
 from typing import Dict, List
 import numpy as np
 

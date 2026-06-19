@@ -4,7 +4,7 @@ import torch
 from pathlib import Path
 from dotenv import load_dotenv
 import itertools
-PATH_PROJECT = os.path.join('..', '..')
+PATH_PROJECT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(PATH_PROJECT)
 env_file = os.path.join(PATH_PROJECT, '.env')
 load_dotenv(env_file)

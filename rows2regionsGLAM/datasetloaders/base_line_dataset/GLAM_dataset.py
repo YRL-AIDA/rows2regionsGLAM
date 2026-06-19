@@ -80,7 +80,7 @@ class GLAMDataset(Dataset):
             
             del torch_dict['sp_A']
         except Exception as e:
-            print(e)
+            print(f"ERROR in {name_file}: {e}")
             return {}
         return torch_dict
 
@@ -102,7 +102,7 @@ class GLAMDataset(Dataset):
             return None
 
         def get_mini_seg(r):
-            img_seg = ImageSegment(dict_2p=r)
+            img_seg = ImageSegment(dict_p_size=r)
             if img_seg.height < 5:
                 return img_seg
             delta = int(img_seg.height / 5)
@@ -257,17 +257,23 @@ class GLAMDataset(Dataset):
     
     
     def __str__(self):
+        first_keys = self[0].keys()
+        last_keys = self[-1].keys()
+
+        def _safe_shape(d, key):
+            return np.shape(d[key]) if key in d else "N/A"
+
         return f"""
             DATASET INFO:
             count row: {len(self)}
-            first: {self[0].keys()}
-            \t A:{np.shape(self[0]["sp_A"])}
-            \t nodes_feature:{np.shape(self[0]["X"])}
-            \t edges_feature:{np.shape(self[0]["Y"])}
-            \t true_edges:{np.shape(self[0]["true_edges"])}
-            end:{self[-1].keys()}
-            \t A:{np.shape(self[-1]["sp_A"])}
-            \t nodes_feature:{np.shape(self[-1]["X"])}
-            \t edges_feature:{np.shape(self[-1]["Y"])}
-            \t true_edges:{np.shape(self[-1]["true_edges"])}
+            first: {first_keys}
+            \t A:{_safe_shape(self[0], 'sp_A')}
+            \t nodes_feature:{_safe_shape(self[0], 'X')}
+            \t edges_feature:{_safe_shape(self[0], 'Y')}
+            \t true_edges:{_safe_shape(self[0], 'true_edges')}
+            end:{last_keys}
+            \t A:{_safe_shape(self[-1], 'sp_A')}
+            \t nodes_feature:{_safe_shape(self[-1], 'X')}
+            \t edges_feature:{_safe_shape(self[-1], 'Y')}
+            \t true_edges:{_safe_shape(self[-1], 'true_edges')}
         """

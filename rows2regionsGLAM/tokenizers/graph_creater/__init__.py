@@ -1,4 +1,4 @@
-from pager import ImageSegment
+from pagerlib.dtypes import ImageSegment
 import numpy as np
 
 

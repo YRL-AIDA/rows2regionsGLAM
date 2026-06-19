@@ -18,8 +18,6 @@ def _calculate_positiv_negativ(dataset):
         M = len(g['true_nodes'])
         nodes = np.array(g['true_nodes'].cpu())
         pp = nodes.sum(axis=0)
-        if type(pp) is np.float32:
-            continue
         nn = M - pp
 
         positiv_nodes.append(pp)
@@ -31,11 +29,13 @@ def calculate_imbalance(dataset):
     positiv, negativ, positiv_nodes, negativ_nodes = _calculate_positiv_negativ(dataset)
     P = np.mean(positiv)
     N = np.mean(negativ)
-    PP = np.mean(positiv_nodes, axis=0)
-    NN = np.mean(negativ_nodes, axis=0)
-    disb_nodes = NN / PP
-    disb_nodes[PP == 0.0] = 0
-    publaynet_imbalance = (disb_nodes / sum(disb_nodes)).tolist()
+    PP = np.atleast_1d(np.mean(positiv_nodes, axis=0))
+    NN = np.atleast_1d(np.mean(negativ_nodes, axis=0))
+    disb_nodes = np.where(PP == 0.0, 0.0, NN / PP)
+    if disb_nodes.sum() == 0:
+        publaynet_imbalance = disb_nodes.tolist()
+    else:
+        publaynet_imbalance = (disb_nodes / disb_nodes.sum()).tolist()
     edge_imbalance = float(N / P)
 
     return publaynet_imbalance, edge_imbalance

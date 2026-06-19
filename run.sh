@@ -2,4 +2,4 @@
 set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_ROOT"
-exec python scripts/run.py "$@"
+exec python3 scripts/run.py "$@"

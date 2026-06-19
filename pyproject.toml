@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rows2regionsGLAM"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "pagerlib @ git+https://github.com/YRL-AIDA/PageRLib.git@v0.0.8",
+    "pandas",
+    "torchmetrics"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]

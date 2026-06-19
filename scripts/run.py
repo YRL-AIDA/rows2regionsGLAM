@@ -6,8 +6,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+PYTHON_BIN = os.environ.get("PYTHON_BIN", "/Users/macbookair/program/python/PageR/env/bin/python")
+
 from dotenv import dotenv_values
-from scripts.configs import PROJECT_ROOT, resolve_env_file, write_dotenv, ENV_TEMPLATES
+from scripts.configs import resolve_env_file, write_dotenv, ENV_TEMPLATES
 
 
 def run_experiment(experiment, env_path):
@@ -29,15 +34,19 @@ def run_experiment(experiment, env_path):
 
     merged_env = os.environ.copy()
     merged_env.update(env_vars)
+    pythonpath = str(PROJECT_ROOT)
+    if "PYTHONPATH" in merged_env:
+        pythonpath = f"{pythonpath}:{merged_env['PYTHONPATH']}"
+    merged_env["PYTHONPATH"] = pythonpath
 
-    subprocess.run([sys.executable, str(start_script)], env=merged_env, cwd=str(PROJECT_ROOT))
+    subprocess.run([PYTHON_BIN, str(start_script)], env=merged_env, cwd=str(PROJECT_ROOT))
 
-    src_csv = PROJECT_ROOT / 'experiments' / experiment / 'result' / 'results.csv'
+    src_csv = PROJECT_ROOT / 'result' / 'results.csv'
     if src_csv.exists():
         dst_dir = PROJECT_ROOT / 'results' / experiment
         dst_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src_csv, dst_dir / 'results.csv')
-        print(f'Copied results to results/{experiment}/results.csv')
+        shutil.move(src_csv, dst_dir / 'results.csv')
+        print(f'Moved results to results/{experiment}/results.csv')
 
 
 if __name__ == '__main__':

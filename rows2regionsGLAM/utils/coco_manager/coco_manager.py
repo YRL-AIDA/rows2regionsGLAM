@@ -1,5 +1,5 @@
 import json
-from pager.page_model.sub_models.dtype import ImageSegment
+from pagerlib.dtypes import ImageSegment
 
 class COCOManager:
     def __init__(self, **conf):
