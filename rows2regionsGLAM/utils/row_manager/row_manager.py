@@ -1,8 +1,8 @@
-from pager import PDFModel, RowsModel, PDF2Rows
-from pager.page_model.sub_models.dtype import Row, ImageSegment
+from pager import Row, ImageSegment
+
 import numpy as np
 class RowManager:
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
@@ -11,31 +11,33 @@ class RowManager:
         self.loger("Create RowManager")
 
         if "add_image" not in conf.keys(): 
-            raise Exception('Добавлять к строкам изображения? ("add_image: True or False")')
-        else:
-            self.is_add_image = conf['add_image']
-            self.loger(f"Add image as row: {conf['add_image']}")
+            conf['add_image'] = True
+            
+        self.is_add_image = conf['add_image']
+        self.loger(f"Add image as row: {conf['add_image']}")
 
-        self.pdf_model = PDFModel()
-        self.rows_model = RowsModel()
-        self.pdf2row = PDF2Rows()
 
     def get_row_array_from_json(self, json_pdf):
         json_rows = self.get_row_json_from_pdf_json( json_pdf)
         return [Row(json_row) for json_row in json_rows]
     
     def get_row_json_from_pdf_json(self, json_pdf):
-        self.pdf_model.from_dict(json_pdf)
-        self.pdf2row.convert(self.pdf_model, self.rows_model)
-        rows = self.rows_model.to_dict()['rows']
         if self.is_add_image:
             image_rows = json_pdf['images']
-            rows = self.fix_row_this_image(rows, image_rows)
+            rows = self.fix_row_this_image(json_pdf['rows'], image_rows)
         return rows
     
 
     def fix_row_this_image(self, rows, image_rows):
-        img_rows = [Row(row) for row in image_rows]
+        def get_rows(dict_row):
+            dict_row['words'] = [{"segment": w['segment'],
+                                 "text": w['data']['text'],
+                                 "font": w['data']['font']} for w in dict_row['words']] if 'words' in dict_row else []
+            return Row(dict_row=dict_row)
+            # r.from_dict(dict_row)
+            # return r
+        
+        img_rows = [get_rows(row) for row in image_rows]
         bool_matrix = np.array([
                         [
                             img_row_i.segment.is_intersection(img_row_j.segment)
@@ -69,7 +71,7 @@ class RowManager:
             for block in blocks
         ]
         new_rows= []
-        array_rows = [Row(row) for row in rows]
+        array_rows = [get_rows(row) for row in rows]
         for row in array_rows:
             include=True
             for img_row in img_rows:

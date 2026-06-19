@@ -1,0 +1,11 @@
+T: 2026-04-08 15:08:21.920624
+PDF Reader: PDFMiner
+T: 2026-04-08 15:08:21.920769
+Create RowManager
+Add image as row: True
+COCOManager
+T: 2026-04-08 15:08:21.920837
+COCOManager
+T: 2026-04-08 15:08:21.920872
+Create Ploter
+[{'supercategory': '', 'id': 1, 'name': 'text'}, {'supercategory': '', 'id': 2, 'name': 'title'}, {'supercategory': '', 'id': 3, 'name': 'list'}, {'supercategory': '', 'id': 4, 'name': 'table'}, {'supercategory': '', 'id': 5, 'name': 'figure'}]

@@ -207,12 +207,14 @@ marimo/_lsp/
 __marimo__/
 
 .DS_Store
+.vscode
 
-log.txt
+log*
 error_list_file.txt
 rez_test_*
 row2region_GLAM_tmp*
-
+*_tmp_*
 notebooks/* 
 !notebooks/*.ipynb
-
+**/result/
+!**/result/results.csv

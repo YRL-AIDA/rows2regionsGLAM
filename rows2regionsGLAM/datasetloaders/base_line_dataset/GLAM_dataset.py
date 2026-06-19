@@ -4,11 +4,18 @@ import json
 import numpy as np
 import os 
 from ...utils.coco_manager import COCOManager
-from json import JSONEncoder 
-import warnings
+from ...utils.cacher import Cacher
+from ...utils.intersect_util import get_num_regions_of_rows
+from pathlib import Path
+from dotenv import load_dotenv
+
+from pagerlib.dtypes import ImageSegment
+
+# env_file = os.path.join('..', '.env')
+# load_dotenv(env_file)
 
 class GLAMDataset(Dataset):
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
@@ -17,20 +24,15 @@ class GLAMDataset(Dataset):
         self.loger("Create Dataset")
 
         if "pdf_dir" in conf.keys(): 
-            self.pdf_dir  = conf["pdf_dir"] 
+            self.pdf_dir  = Path(conf["pdf_dir"])
         else:
             raise Exception('Укажите папку до pdf файлов ("pdf_dir": path)')
-        self.loger("Path Dataset: {self.pdf_dir}")
-
-        if "coco_file" in conf.keys(): 
-            self.coco_file  = conf["coco_file"] 
-            self.coco_manager = COCOManager({"loger": self.loger, "coco_path": self.coco_file})
-        else:
-            raise Exception('Укажите папку до COCO-разметки файлов ("coco_file": path)')
-        self.loger("Path COCO: {self.coco_file}")
-
-        if "count_class" in conf.keys(): 
-            self.count_class = conf["count_class"] 
+        self.loger(f"Path Dataset: {self.pdf_dir}")
+        
+        if "coco_manager" in conf.keys(): 
+            self.coco_manager = conf['coco_manager']
+    
+            self.count_class = len(self.coco_manager.classes)
         else:
             raise Exception('Укажите число классов в наборе ("count_class": int)')
 
@@ -38,30 +40,84 @@ class GLAMDataset(Dataset):
             self.default_index = conf["default_index"] 
         else:
             raise Exception('Укажите индекс класса по умолчанию ("default_index": int)')
-
+        
         if "cache_dir" in conf.keys():
-            self.cache_dir = conf["cache_dir"]
-            if os.path.exists(self.cache_dir):
-                if len(os.listdir(self.cache_dir)) != 0:
-                    warnings.warn("Кеш не пустой !!!", DeprecationWarning)
-            else:
-                os.mkdir(self.cache_dir)
+            self.cacher = Cacher(cache_dir=conf["cache_dir"], 
+                                 cache_fun=self.pdf2json_for_model)
         else:
             raise Exception('Укажите папку для cache ("cache_dir": path)')
         
-        if "pdf2torch_dict" in conf.keys(): 
-            self.pdf2torch_dict = conf["pdf2torch_dict"] 
+        if "pred" in conf.keys(): 
+            self.pred = conf["pred"] 
         else:
-            raise Exception('Напишите функцию перевода pdf в torch_dict ("pdf2torch_dict": pdf2torch_dict(path_pdf, coco_dict_file) )')
+            raise Exception('Напишите функцию перевода pdf в torch_dict ("pred": pred(path_pdf))')
 
+        
+        self.device = torch.device(os.environ.get('DEVICE', 'cpu'))
         pdfs = [f for f in os.listdir(self.pdf_dir) if f.split('.')[-1] == 'pdf' and not os.path.isdir(f)]
-        jsons = [f for f in os.listdir(self.cache_dir)]
         pdfs.sort()
         self.count = len(pdfs)
         self.pdf_names = [os.path.basename(pdf) for pdf in pdfs]
-        self.cache_names = [os.path.basename(js) for js in jsons]
-        self.coco_ann = self.coco_manager.get_regions_from_json()
+        self.is_train = False
 
+    def train(self):
+        self.is_train = True
+        
+    def test(self):
+        self.is_train = False
+
+    def pdf2json_for_model(self, name_file):
+        try:
+            print(name_file)
+            rez  = self.pred(self.pdf_dir/name_file)
+            torch_dict = rez['torch_dict']
+            
+            if self.is_train:
+                true_regions, true_category = self.coco_manager(name_file, rez['pdf_json'])   
+                true_edges, true_nodes = self._get_true_edges(torch_dict,  rez['pdf_json']['rows'], true_regions, true_category) 
+                torch_dict['true_edges'] = true_edges
+                torch_dict['true_nodes'] = true_nodes
+            
+            del torch_dict['sp_A']
+        except Exception as e:
+            print(e)
+            return {}
+        return torch_dict
+
+
+    def _get_true_edges(self, token, rows, region_segs, region_categories):
+        def is_one_region(num_reg1, num_reg2):
+            if num_reg1 == None:
+                return 0
+            if num_reg2 == None:
+                return 0
+            if num_reg1 == num_reg2:
+                return 1
+            return 0
+
+        def get_category(seg, region_segs, region_categories):
+            for r, c in zip(region_segs, region_categories):
+                if seg.is_intersection(r):
+                    return c
+            return None
+
+        def get_mini_seg(r):
+            img_seg = ImageSegment(dict_2p=r)
+            if img_seg.height < 5:
+                return img_seg
+            delta = int(img_seg.height / 5)
+            img_seg.y_bottom_right = img_seg.y_bottom_right - delta
+            img_seg.y_top_left = img_seg.y_top_left + delta
+            return img_seg
+
+        row_segments = [get_mini_seg(row['segment']) for row in rows]
+        A = token['inds']
+        
+        nums_regions = get_num_regions_of_rows(region_segs, row_segments)
+        true_edges = [is_one_region(nums_regions[i], nums_regions[j]) for i, j in zip(A[0], A[1])]
+        true_nodes = [get_category(row_seg, region_segs, region_categories) for row_seg in row_segments]
+        return true_edges, true_nodes
+    
     def test_cache(self): 
         files  = sorted(os.listdir(self.cache_dir))
 
@@ -111,7 +167,7 @@ class GLAMDataset(Dataset):
         self.files = files
         self.count = len(self.files)
 
-
+    
     def __len__(self):
         return self.count
 
@@ -124,59 +180,94 @@ class GLAMDataset(Dataset):
             else:
                 base_vec[c] = 1
             return base_vec
-        return torch.tensor([vec_class(c) for c in classes], dtype=torch.float32)
-        
-        
+        return torch.tensor([vec_class(c) for c in classes], dtype=torch.float32, device=self.device)
+
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
-        if not name_file+'.json' in self.cache_names:
-            self.cache_file(name_file)
-        path = os.path.join(self.cache_dir, name_file+'.json')
         
-        with open(path, 'r') as f:
-            data = json.load(f)
+        # print(name_file)
+        if not self.is_train:
+            try :
+                bboxes_true, classes_true = self._get_true_regions(idx)
+                return {"bboxes_true":bboxes_true, 
+                        "classes_true":classes_true,
+                        "path": Path(self.pdf_dir, name_file)}
+            except Exception as e:
+                print(e)
+                return {
+                    "bboxes_true":[], 
+                    "classes_true":[],
+                    "path": Path(self.pdf_dir, name_file)
+                }
+        try:
+            data = self.cacher(name_file)
+        except Exception as e:
+            print(e)
+            print("cache error", name_file)
+            return {}
         if len(data.keys()) == 0:
             return {}
-        data['X'] = torch.tensor(data['X'], dtype=torch.float32)
-        data['Y'] = torch.tensor(data['Y'], dtype=torch.float32)
-        N = data["N"]
-        i = data['inds']
-        index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
-        sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32)
-        data['sp_A'] = sp_A
-        data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32)
-        data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
-        data['file_name'] = '.'.join(name_file.split('.')[:-1])
-        
+        try:    
+            data['X'] = self.to_tensor_safe(data['X'], torch.float32, self.device)
+            data['Y'] = self.to_tensor_safe(data['Y'], torch.float32, self.device)
+            N = data["N"]
+            i = data['inds']
+            index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
+            sp_A = torch.sparse_coo_tensor(indices=index_for_mtrx, values=[1 for e in index_for_mtrx[0]], size=(N, N), dtype=torch.float32, device=self.device)
+            data['sp_A'] = sp_A
+            data['true_edges'] = torch.tensor([0 if i is None else i for i in data['true_edges']], dtype=torch.float32, device=self.device)
+            data['true_nodes'] = self.__class_to_vec(data['true_nodes'])
+            data['file_name'] = '.'.join(name_file.split('.')[:-1])
+            
+        except Exception as e:
+            print('data_error', name_file, e)
+            return {}
         return data
-    
-    def cache_file(self, name_file):
-        path_file = os.path.join(self.pdf_dir, name_file)
-        json_res = self.pdf2torch_dict(path_file, self.coco_ann[name_file])
-        name_json = os.path.join(self.cache_dir, name_file+'.json')
-        with open(name_json, 'w') as f:  
-            json.dump(json_res, f, cls=EncodeTensor) 
 
+    def to_tensor_safe(self, obj, dtype, device):
+        if torch.is_tensor(obj):
+            return obj.detach().clone().to(dtype=dtype, device=device)
+        else:
+            return torch.tensor(obj, dtype=dtype, device=device)
+
+    def _get_true_regions(self, idx):
+        
+        name_file = self.pdf_names[idx]
+        rez  = self.pred(self.pdf_dir/name_file)
+        true_regions, classes_true = self.coco_manager(name_file, rez['pdf_json'])
+        clean_bboxes, classes_true = self._clean_true_regions(true_regions, classes_true)
+        bboxes_true =[reg.get_segment_p_size() for reg in clean_bboxes]
+        return bboxes_true, classes_true
+
+    def _clean_true_regions(self, true_regions, true_classes):
+        clean_bboxes = []
+        classes_true = []
+        for cl, reg in zip(true_classes, true_regions):
+            if reg.height > 3 and reg.width > 3:
+                clean_bboxes.append(reg)
+                classes_true.append(cl)
+        return clean_bboxes, classes_true
+
+    def init(self):
+        N = self.count
+        print("(init) SIZE DATASET: ", N)
+        for i, d in enumerate(self):
+            print(f"{(i+1)/N*100:4.2f} %", end='\r')
+
+    
+    
     def __str__(self):
-        return f"""DATASET INFO:
-count row: {len(self)}
-first: {self[0].keys()}
-\t A:{np.shape(self[0]["sp_A"])}
-\t nodes_feature:{np.shape(self[0]["X"])}
-\t edges_feature:{np.shape(self[0]["Y"])}
-\t true_edges:{np.shape(self[0]["true_edges"])}
-end:{self[-1].keys()}
-\t A:{np.shape(self[-1]["sp_A"])}
-\t nodes_feature:{np.shape(self[-1]["X"])}
-\t edges_feature:{np.shape(self[-1]["Y"])}
-\t true_edges:{np.shape(self[-1]["true_edges"])}
-
-"""
-    
-
-
-class EncodeTensor(JSONEncoder, Dataset):  
-    def default(self, obj):
-        if isinstance(obj, torch.Tensor):  
-            return obj.cpu().detach().numpy().tolist()  
-        return super(EncodeTensor, self).default(obj)  
+        return f"""
+            DATASET INFO:
+            count row: {len(self)}
+            first: {self[0].keys()}
+            \t A:{np.shape(self[0]["sp_A"])}
+            \t nodes_feature:{np.shape(self[0]["X"])}
+            \t edges_feature:{np.shape(self[0]["Y"])}
+            \t true_edges:{np.shape(self[0]["true_edges"])}
+            end:{self[-1].keys()}
+            \t A:{np.shape(self[-1]["sp_A"])}
+            \t nodes_feature:{np.shape(self[-1]["X"])}
+            \t edges_feature:{np.shape(self[-1]["Y"])}
+            \t true_edges:{np.shape(self[-1]["true_edges"])}
+        """

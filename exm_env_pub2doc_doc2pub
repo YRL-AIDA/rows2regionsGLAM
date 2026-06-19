@@ -1,0 +1,17 @@
+DEVICE='cpu'
+
+DOCLAYNET_TRAIN_PDF_PATH = 'E:/DocLayNet_core_10k/PDF'
+DOCLAYNET_COCO_PATH = 'E:/DocLayNet_core_10k/train.json'
+DOCLAYNET_TEST_PDF_PATH = 'E:/DocLayNet/PDF'
+DOCLAYNET_TEST_COCO_PATH_FOR_DOC = 'E:/DocLayNet/train (old).json'
+DOCLAYNET_TEST_COCO_PATH_FOR_PUB = 'E:/DocLayNet/train.json'
+DOCLAYNET_TRAIN_CASH_PDF_PATH = 'E:/DocLayNet_core_10k/tmp/cache_miner_train'
+DOCLAYNET_TEST_CASH_PDF_PATH_FOR_DOC = 'E:/DocLayNet_core_10k/tmp/cache_miner_test_for_doc'
+DOCLAYNET_TEST_CASH_PDF_PATH_FOR_PUB = 'E:/DocLayNet_core_10k/tmp/cache_miner_test_for_pub'
+
+PUBLAYNET_TRAIN_PDF_PATH = 'E:/10k_publaynet/pdfs/train'
+PUBLAYNET_COCO_PATH = 'E:/10k_publaynet/publaynet/train.json'
+PUBLAYNET_TEST_PDF_PATH='E:/10k_publaynet/pdfs/dev'
+PUBLAYNET_TEST_COCO_PATH='E:/10k_publaynet/publaynet/val.json'
+PUBLAYNET_TRAIN_CASH_PDF_PATH='E:/10k_publaynet/tmp/cache_miner_train'
+PUBLAYNET_TEST_CASH_PDF_PATH='E:/10k_publaynet/tmp/cache_miner_test'

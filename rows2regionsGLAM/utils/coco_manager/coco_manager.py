@@ -1,25 +1,24 @@
 import json
+from pager.page_model.sub_models.dtype import ImageSegment
 
 class COCOManager:
-    def __init__(self, conf):
+    def __init__(self, **conf):
         if "loger" not in conf.keys():
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
             self.loger = conf['loger']
+        if "name_dataset" not in conf.keys() or not conf['name_dataset'] in ("doclaynet", "publaynet"):
+            raise Exception('Передайте имя датасета "name_dataset": str ("doclaynet", "publaynet")')
+        self.name_dataset = conf['name_dataset']
+
         self.loger("COCOManager")
         self.loger.time_log()
 
-        if "loger" not in conf.keys():
-            raise Exception('Создайте и передайте логер "loger": Loger(path))')
-        else:
-            self.loger = conf['loger']
-        self.loger("COCOManager")
         if "coco_path" not in conf.keys():
-            raise Exception('Создайте и передайте логер "coco_path": path.json)')
+            raise Exception('Создайте и путь coco_path": path.json)')
         else:
             self.coco_path = conf['coco_path']
-
-
+        self.regions, self.classes = self.get_regions_from_json()
 
 
     def get_regions_from_json(self):
@@ -35,7 +34,6 @@ class COCOManager:
             name = im['file_name'][:-3]+'pdf'
             img_id = im['id']
             id_2_file[img_id] = name 
-            
         
         get_info = lambda an: {'segment': {
             'x_top_left': int(an['bbox'][0]),
@@ -55,4 +53,30 @@ class COCOManager:
                 pdf_ann[pdf_name] = {'regions': [get_info(an)]}
 
         self.loger(str(coco['categories']))
-        return pdf_ann
+
+        coco_classes = {}
+        for cat in coco['categories']:
+            coco_classes[cat["id"]] = cat["name"]
+        coco_classes[0] = 'other'
+        self.coco_classes = coco_classes
+        return pdf_ann, coco_classes
+    
+    def __call__(self, name_pdf, page_info):
+        if self.name_dataset == "doclaynet":
+            coef_w, coef_h = page_info['width'] / 1025, page_info['height'] / 1025
+        elif self.name_dataset == "publaynet":
+            coef_w, coef_h = 1, 1
+        else:
+            raise Exception(f"name error '{self.name_dataset}' ")
+        
+        regions = self.regions[name_pdf]['regions']
+        
+        regions = [r for r in regions if r['segment']['height'] > 0]
+        reg_segments = [ImageSegment(dict_p_size={
+            "x_top_left": int(r['segment']['x_top_left'] * coef_w),
+            "y_top_left": int(r['segment']['y_top_left'] * coef_h),
+            "width": int(r['segment']['width'] * coef_w),
+            "height": int(r['segment']['height'] * coef_h)}) for r in regions]
+        reg_categories = [r['category_id'] for r in regions]
+        return reg_segments, reg_categories
+        

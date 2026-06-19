@@ -1,1 +1,1 @@
-from .grid_metrics import GridMetric
+from .grid_metrics import GridMetric, MultiGridMetric

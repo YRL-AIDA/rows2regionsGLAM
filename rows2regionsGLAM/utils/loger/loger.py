@@ -1,7 +1,9 @@
 import datetime
 
 class Loger:
-    def __init__(self, LOG_FILE):
+    def __init__(self, LOG_FILE=None):
+        if LOG_FILE == None:
+            LOG_FILE = f'log_{datetime.datetime.now().date()}.txt'
         self.log_file = LOG_FILE
 
     def __call__(self, str_):
