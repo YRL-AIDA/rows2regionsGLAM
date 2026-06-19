@@ -20,14 +20,43 @@ def save_model(model, path_model):
 
 def _load_checkpoint(model, path_model, restart_num=None):
     dir_model = os.path.dirname(path_model)
-    name_model = os.path.basename(path_model)
-    names = [n for n in os.listdir(dir_model) if name_model+'_tmp_' in n]
+    base = os.path.basename(path_model)
+    # Отделяем расширение, если есть
+    name, ext = os.path.splitext(base)
+    
+    # 1. Попробовать загрузить финальную модель
+    if restart_num is None and os.path.exists(path_model):
+        model.load_state_dict(torch.load(path_model, weights_only=True))
+        return None  # или 0, означающий финальную версию
+    
+    # 2. Ищем tmp-файлы
+    pattern = f"{name}_tmp_"
+    tmp_files = [f for f in os.listdir(dir_model) if f.startswith(pattern) and f.endswith(ext)]
+    if not tmp_files:
+        return None
+    
+    # Извлекаем номера
+    nums = []
+    for f in tmp_files:
+        # Убираем расширение для извлечения номера
+        without_ext = f[:-len(ext)] if ext else f
+        try:
+            num = int(without_ext.split("_tmp_")[-1])
+            nums.append(num)
+        except ValueError:
+            continue
+    
+    if not nums:
+        return None
+    
     if restart_num is None:
-        list_num = [int(n.split("_tmp_")[-1]) for n in names]
-        if len(list_num) == 0:
-            return
-        restart_num = max(list_num) 
-
-    checkpoint_path = os.path.join(dir_model, name_model+f"_tmp_{restart_num}")
-    model.load_state_dict(torch.load(checkpoint_path, weights_only=True))
-    return restart_num
+        restart_num = max(nums)
+    elif restart_num not in nums:
+        # Если запрошенный номер не найден – можно либо вернуть None, либо последний
+        restart_num = max(nums)
+    
+    checkpoint_path = os.path.join(dir_model, f"{name}_tmp_{restart_num}{ext}")
+    if os.path.exists(checkpoint_path):
+        model.load_state_dict(torch.load(checkpoint_path, weights_only=True))
+        return restart_num
+    return None

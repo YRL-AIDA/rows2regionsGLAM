@@ -74,7 +74,7 @@ class Trainer:
                 pred_graph_dict = model(data_graph_dict)
                 loss = criterion(pred_graph_dict, data_graph_dict)
                 my_loss_list.append(loss.item())
-                print(f"{(j+1)/len(batch)*100:.2f} % Batch loss={my_loss_list[-1]:.4f}" + " "*40, end="\r")
+                # print(f"{(j+1)/len(batch)*100:.2f} % Batch loss={my_loss_list[-1]:.4f}" + " "*40, end="\r")
             except Exception as e:
                 print(e)
                 if "Y" in data_graph_dict.keys():

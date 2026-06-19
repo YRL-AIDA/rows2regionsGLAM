@@ -15,89 +15,99 @@ from utils import start_experiments
 if __name__ == "__main__":
 
     def get_exp(coef):
+        mlp0 = 15
+        mlp1 = int(coef*256)
+        mlp2 = int(coef*512)         # Выход
         
-        input_x = 15
-        input_y = 4
+        mlp1_in = mlp2 
+        gnn1_in = int(coef*1024)
+        gnn1_out = int(coef*512)      # Выход
         
-        linear1_pred = [int(coef*256), int(coef*128)]
-        gnn1 = [(int(coef*256), int(coef*128)), (int(coef*256), int(coef*128))]
+        mlp2_in = mlp2+gnn1_out
+        gnn2_in = int(coef*1024)
+        gnn2_out = int(coef*512)      # Выход
         
-        cl_node = [int(coef*256), int(coef*128)]
+        cls_1 = mlp1_in+gnn1_out+gnn2_out
+        cls_2 = int(coef*512)
+        cls_3 = int(coef*64)
         
-        linear2_pred = [int(coef*256), int(coef*128)]
-        gnn2 = [(int(coef*256), int(coef*128)), (int(coef*256), int(coef*128))]
-        linear2_post = [int(coef*256), int(coef*128)]
+        mlp1_seg = mlp1_in+gnn1_out+gnn2_out
+        mlp2_seg = int(coef*1024)
+        mlp3_seg = int(coef*512)
+        mlp4_seg = int(coef*256)
+        
+        mlp3_in = mlp4_seg
+        gnn3_in = int(coef*256)
+        gnn3_out = int(coef*256)
+        
+        mlp4_in = mlp4_seg+gnn3_out
+        gnn4_in = int(coef*256)
+        gnn4_out = int(coef*128)
+        
+        seg1 = 2*(mlp4_seg+gnn3_out+gnn4_out+mlp0)+4
+        seg2 = int(coef*128)
+        seg3 = int(coef*32)
 
-        edge = [int(coef*256), int(coef*64)]
-
-        
-        params = {
-            "node_block": { # Первый слой содержит число features
-                "linear_pred": [
-                    {"in": input_x, "out": linear1_pred[0], "activation": "gelu"},
-                    {"in": linear1_pred[0], "out": linear1_pred[1], "activation": "gelu"},
+        BASE_PARAMS = {
+    "node_block": { # Первый слой содержит число features
+        "linear_pred": [
+            {"in": mlp0, "out": mlp1, "activation": "gelu"},
+            {"in": mlp1, "out": mlp2, "activation": "gelu"},
+        ],
+        "gnn": [
+            ("tag", {"batch_norm": True, "concat": True,
+                     "in":mlp1_in, "in_gnn":gnn1_in, "out_gnn":gnn1_out, 
+                     "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
+            ("tag", {"batch_norm": False,"concat": True,
+                     "in":mlp2_in, "in_gnn":gnn2_in, "out_gnn":gnn2_out, 
+                     "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                 ],
-                "gnn": [
-                    ("tag", {"batch_norm": True, "concat": True,
-                             "in":linear1_pred[-1],  "in_gnn":gnn1[0][0], "out_gnn":gnn1[0][1], 
-                             "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
-                    ("tag", {"batch_norm": False,"concat": True,
-                             "in":linear1_pred[-1]+gnn1[0][1], "in_gnn":gnn1[1][0], "out_gnn":gnn1[1][1], 
-                             "gnn_activation":"gelu", "activation":"gelu", "K":3}),
-                        ],
-                # "linear_post": [ # PRED похож на POST
-                #     {"in": 128+128+128, "out": 256, "activation": "gelu"},
-                #     {"in": 256, "out": 128, "activation": "gelu"},
-                #     {"in": 128, "out": 32, "activation": "gelu"},
-                # ]
-            },
-            "node_classifier_block": {
-                "linear_post": [ # Удобно задать MLP как только POST часть
-                    {"in": linear1_pred[-1]+gnn1[0][1]+gnn1[1][1], "out": cl_node[0], "activation": "gelu"},
-                    {"in": cl_node[0], "out": cl_node[1], "activation": "gelu"},
-                    {"in": cl_node[1], "out": 6, "activation": "none"},
-                ]
-            },
-            "post_node_block": {
-                "linear_pred": [
-                    {"in": linear1_pred[-1]+gnn1[0][1]+gnn1[1][1], "out": linear2_pred[0], "activation": "gelu"},
-                    {"in": linear2_pred[0], "out": linear2_pred[1], "activation": "gelu"},
+    },
+    "node_classifier_block": {
+        "linear_post": [ # Удобно задать MLP как только POST часть
+            {"in": cls_1, "out": cls_2, "activation": "gelu"},
+            {"in": cls_2, "out": cls_3, "activation": "gelu"},
+            {"in": cls_3, "out": 6,     "activation": "none"},
+        ]
+    },
+    "post_node_block": {
+        "linear_pred": [
+            {"in": mlp1_seg, "out": mlp2_seg, "activation": "gelu"},
+            {"in": mlp2_seg, "out": mlp3_seg, "activation": "gelu"},
+            {"in": mlp3_seg, "out": mlp4_seg, "activation": "gelu"},
+        ],
+        "gnn": [
+            ("tag", {"batch_norm": True, "concat": True,
+                     "in":mlp3_in,  "in_gnn":gnn3_in, "out_gnn":gnn3_out, 
+                     "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
+            ("tag", {"batch_norm": False,"concat": True,
+                     "in":mlp4_in, "in_gnn":gnn4_in, "out_gnn":gnn4_out, 
+                     "gnn_activation":"gelu", "activation":"gelu", "K":3}),
                 ],
-                "gnn": [
-                    ("tag", {"batch_norm": True, "concat": True,
-                             "in":linear2_pred[-1],  "in_gnn":gnn2[0][0], "out_gnn":gnn2[0][1], 
-                             "gnn_activation":"gelu", "activation":"gelu", "K":3}), # Еще есть concat с прошлым слоем
-                    ("tag", {"batch_norm": False,"concat": True,
-                             "in":linear2_pred[-1]+gnn2[0][1], "in_gnn":gnn2[1][0], "out_gnn":gnn2[1][1], 
-                             "gnn_activation":"gelu", "activation":"gelu", "K":3}),
-                        ],
-                "linear_post": [ # PRED похож на POST
-                    {"in": linear2_pred[-1]+gnn2[0][1]+gnn2[1][1], "out": linear2_post[0], "activation": "gelu"},
-                    {"in": linear2_post[0], "out": linear2_post[1], "activation": "gelu"},
-                ]
-            }, # НЕ ОБЯЗАТЕЛЬНЫЙ
-            # "conjugate_edge_block": {}, # НЕ ОБЯЗАТЕЛЬНЫЙ
-            "edge_classifier_block": {
-                 "linear_post": [ # Удобно задать MLP как только POST часть
-                    {"in": 2*(linear2_post[1]+input_x)+input_y, "out": edge[0], "activation": "gelu"},
-                    {"in": edge[0], "out": edge[1], "activation": "gelu"},
-                    {"in": edge[1], "out": 1, "activation": "none"},
-                ]
-            },
-            "epochs" : 10,
-            "batch_size"  : 64,
-            "learning_rate" : 0.001,
-            "seg_k"  : 0.5,
-            "loss_params" : {
-                "edge_coef": 0.8,
-                "node_coef": 0.2
-            }
-        }
+    }, 
+    "edge_classifier_block": {
+         "linear_post": [ # Удобно задать MLP как только POST часть
+            {"in": seg1, "out": seg2, "activation": "gelu"},
+            {"in": seg2, "out": seg3, "activation": "gelu"},
+            {"in": seg3, "out": 1, "activation": "none"},
+        ]
+    },
+    "epochs" : 10,
+    "batch_size"  : 64,
+    "learning_rate" : 0.001,
+    "seg_k"  : 0.5,
+    "save_frequency": 5,
+    "loss_params" : {
+        "edge_coef": 0.8,
+        "node_coef": 0.2
+    },
+    
+}
 
-        return params
+        return BASE_PARAMS
         
     start_experiments(
-        {f"size_times_{coef}": get_exp(coef)
-            for coef in [0.25, 0.5, 1, 2, 4]
+        {f"size_times_{coef}_no{ed}": get_exp(coef)
+            for coef in [0.125, 0.25, 0.5, 1, 2, 4] for ed in range(3)
         }
     ) 

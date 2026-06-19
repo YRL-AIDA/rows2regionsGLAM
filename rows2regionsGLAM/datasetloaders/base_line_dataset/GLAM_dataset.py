@@ -68,6 +68,7 @@ class GLAMDataset(Dataset):
 
     def pdf2json_for_model(self, name_file):
         try:
+            print(name_file)
             rez  = self.pred(self.pdf_dir/name_file)
             torch_dict = rez['torch_dict']
             
@@ -184,7 +185,7 @@ class GLAMDataset(Dataset):
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
         
-        
+        # print(name_file)
         if not self.is_train:
             try :
                 bboxes_true, classes_true = self._get_true_regions(idx)
@@ -206,9 +207,9 @@ class GLAMDataset(Dataset):
             return {}
         if len(data.keys()) == 0:
             return {}
-        try:
-            data['X'] = torch.tensor(data['X'], dtype=torch.float32, device = self.device)
-            data['Y'] = torch.tensor(data['Y'], dtype=torch.float32, device = self.device)
+        try:    
+            data['X'] = self.to_tensor_safe(data['X'], torch.float32, self.device)
+            data['Y'] = self.to_tensor_safe(data['Y'], torch.float32, self.device)
             N = data["N"]
             i = data['inds']
             index_for_mtrx = [i[0]+i[1], i[1]+i[0]]
@@ -219,9 +220,15 @@ class GLAMDataset(Dataset):
             data['file_name'] = '.'.join(name_file.split('.')[:-1])
             
         except Exception as e:
-            print(name_file, e)
+            print('data_error', name_file, e)
             return {}
         return data
+
+    def to_tensor_safe(self, obj, dtype, device):
+        if torch.is_tensor(obj):
+            return obj.detach().clone().to(dtype=dtype, device=device)
+        else:
+            return torch.tensor(obj, dtype=dtype, device=device)
 
     def _get_true_regions(self, idx):
         

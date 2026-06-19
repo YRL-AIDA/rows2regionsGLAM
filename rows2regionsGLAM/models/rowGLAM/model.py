@@ -4,6 +4,10 @@ from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
 import numpy as np
 import networkx as nx
 
+from torch_geometric.transforms import LineGraph
+from torch_geometric.data import Data
+from torch_geometric.utils import to_dense_adj
+
 class TorchModel(torch.nn.Module):
     """
        Data
@@ -58,16 +62,33 @@ class TorchModel(torch.nn.Module):
             "E_pred": edge_classes
         }
 
+    # def build_conjugate_graph(self, A: torch.Tensor):
+    #     # TODO optimization
+    #     A.fill_diagonal_(0)
+    #     A = np.array(A)
+    #     g = nx.from_numpy_array(A)
+    #     L = nx.line_graph(g)
+    #     A_new = torch.tensor(nx.adjacency_matrix(L).toarray())
+    #     A_new.fill_diagonal_(1)
+    #     return A_new.float()
+
     def build_conjugate_graph(self, A: torch.Tensor):
-        # TODO optimization
-        A.fill_diagonal_(0)
-        A = np.array(A)
-        g = nx.from_numpy_array(A)
-        L = nx.line_graph(g)
-        A_new = torch.tensor(nx.adjacency_matrix(L).toarray())
-        A_new.fill_diagonal_(1)
-        return A_new.float()
-    
+        transform = LineGraph()
+        if A.is_sparse:
+            edge_index = A.indices().contiguous()
+        else:
+            edge_index = A.nonzero().t().contiguous()
+        
+        if edge_index.size(1) == 0:
+            return torch.zeros((2, 0), dtype=torch.long, device=A.device)
+        
+        num_nodes = A.size(0)
+        data = Data(edge_index=edge_index, num_nodes=num_nodes)
+        line_graph_data = transform(data)
+        return line_graph_data.edge_index.to(A.device)
+        
+
+
 
 class CustomLoss(torch.nn.Module):
     def __init__(self, params):
