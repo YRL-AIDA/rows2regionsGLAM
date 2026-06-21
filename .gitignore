@@ -136,6 +136,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
 .envrc
 .venv
 env/
@@ -220,3 +221,5 @@ notebooks/*
 !**/result/results.csv
 
 tmp_feature_*/
+*_res.txt
+tmp_diff_graphs_*/
