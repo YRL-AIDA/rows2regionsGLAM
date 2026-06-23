@@ -3,6 +3,7 @@ from ..graph_creater import graph_creat
 from ..base_tokenizer import BaseTokenizer
 from pagerlib.dtypes import ImageSegment
 import torch
+torch.sparse.check_sparse_tensor_invariants.disable()
 import re
 import numpy as np
 import base64

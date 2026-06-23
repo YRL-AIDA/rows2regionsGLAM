@@ -17,9 +17,18 @@ from rows2regionsGLAM.pipeline import Pipeline
 from rows2regionsGLAM.models import get_loss, get_model, save_model
 
 
-def _cache_dataset_worker(idx, pdf_dir, coco_manager, cache_dir, is_train):
+_worker_ds = None
+
+
+def _init_cache_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
+    global _worker_ds
+    from rows2regionsGLAM.utils.coco_manager import COCOManager
+    from rows2regionsGLAM.pred_processor import PredProcessor
+    from rows2regionsGLAM.datasetloaders.base_line_dataset import GLAMDataset
+
+    coco_manager = COCOManager(loger=None, coco_path=coco_path, name_dataset=name_dataset)
     pred = PredProcessor(loger=None)
-    ds = GLAMDataset(
+    _worker_ds = GLAMDataset(
         coco_manager=coco_manager,
         default_index=0,
         pred=pred,
@@ -27,8 +36,11 @@ def _cache_dataset_worker(idx, pdf_dir, coco_manager, cache_dir, is_train):
         pdf_dir=pdf_dir,
     )
     if is_train:
-        ds.train()
-    ds[idx]
+        _worker_ds.train()
+
+
+def _cache_one(idx):
+    _worker_ds[idx]
 
 
 class ExperimentRunner:
@@ -113,25 +125,24 @@ class ExperimentRunner:
 
     @staticmethod
     def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train):
-        from functools import partial
-
         total = len(dataset)
-        func = partial(
-            _cache_dataset_worker,
-            pdf_dir=pdf_dir,
-            coco_manager=coco_manager,
-            cache_dir=cache_dir,
-            is_train=is_train,
-        )
 
         try:
             from tqdm import tqdm
-            with Pool(cpu_count()) as pool:
-                for _ in tqdm(pool.imap_unordered(func, range(total)), total=total):
+            with Pool(
+                cpu_count(),
+                initializer=_init_cache_worker,
+                initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train),
+            ) as pool:
+                for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
                     pass
         except ImportError:
-            with Pool(cpu_count()) as pool:
-                pool.map(func, range(total))
+            with Pool(
+                cpu_count(),
+                initializer=_init_cache_worker,
+                initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train),
+            ) as pool:
+                pool.map(_cache_one, range(total))
 
     def _build_model(self, name, model_params):
         if self._model_factory:

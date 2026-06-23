@@ -13,7 +13,6 @@ import argparse
 import json
 import os
 import sys
-from functools import partial
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
@@ -30,9 +29,14 @@ from rows2regionsGLAM.datasetloaders.base_line_dataset import GLAMDataset
 PARSER_KEYS = ['N', 'X', 'Y', 'inds']
 
 
-def _build_cache_worker(idx, pdf_dir, coco_manager, cache_dir, is_train):
+_worker_ds = None
+
+
+def _init_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
+    global _worker_ds
+    coco_manager = COCOManager(loger=None, coco_path=coco_path, name_dataset=name_dataset)
     pred = PredProcessor(loger=None)
-    ds = GLAMDataset(
+    _worker_ds = GLAMDataset(
         coco_manager=coco_manager,
         default_index=0,
         pred=pred,
@@ -40,8 +44,11 @@ def _build_cache_worker(idx, pdf_dir, coco_manager, cache_dir, is_train):
         pdf_dir=pdf_dir,
     )
     if is_train:
-        ds.train()
-    ds[idx]
+        _worker_ds.train()
+
+
+def _cache_one(idx):
+    _worker_ds[idx]
 
 
 def _resolve(value):
@@ -146,22 +153,22 @@ def build(env_path, mode, verify_path):
     dataset.train()
     total = len(dataset)
 
-    func = partial(
-        _build_cache_worker,
-        pdf_dir=pdf_dir,
-        coco_manager=coco_manager,
-        cache_dir=cache_dir,
-        is_train=(mode == 'train'),
-    )
-
     try:
         from tqdm import tqdm
-        with Pool(cpu_count()) as pool:
-            for _ in tqdm(pool.imap_unordered(func, range(total)), total=total):
+        with Pool(
+            cpu_count(),
+            initializer=_init_worker,
+            initargs=(pdf_dir, coco_path, name, cache_dir, mode == 'train'),
+        ) as pool:
+            for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
                 pass
     except ImportError:
-        with Pool(cpu_count()) as pool:
-            pool.map(func, range(total))
+        with Pool(
+            cpu_count(),
+            initializer=_init_worker,
+            initargs=(pdf_dir, coco_path, name, cache_dir, mode == 'train'),
+        ) as pool:
+            pool.map(_cache_one, range(total))
 
     print()
 

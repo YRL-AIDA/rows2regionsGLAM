@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset 
 import torch
+torch.sparse.check_sparse_tensor_invariants.disable()
 import json
 import numpy as np
 import os 
