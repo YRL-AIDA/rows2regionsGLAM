@@ -11,9 +11,11 @@
 """
 import argparse
 import json
+import multiprocessing
 import os
 import sys
-from multiprocessing import Pool, cpu_count
+import time
+from multiprocessing import cpu_count
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -34,6 +36,8 @@ _worker_ds = None
 
 def _init_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
     global _worker_ds
+    pid = os.getpid()
+    time.sleep((pid % 10) * 0.3)
     coco_manager = COCOManager(loger=None, coco_path=coco_path, name_dataset=name_dataset)
     pred = PredProcessor(loger=None)
     _worker_ds = GLAMDataset(
@@ -152,19 +156,21 @@ def build(env_path, mode, verify_path):
 
     dataset.train()
     total = len(dataset)
+    workers = min(cpu_count(), 4)
 
+    ctx = multiprocessing.get_context('spawn')
     try:
         from tqdm import tqdm
-        with Pool(
-            cpu_count(),
+        with ctx.Pool(
+            workers,
             initializer=_init_worker,
             initargs=(pdf_dir, coco_path, name, cache_dir, mode == 'train'),
         ) as pool:
             for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
                 pass
     except ImportError:
-        with Pool(
-            cpu_count(),
+        with ctx.Pool(
+            workers,
             initializer=_init_worker,
             initargs=(pdf_dir, coco_path, name, cache_dir, mode == 'train'),
         ) as pool:

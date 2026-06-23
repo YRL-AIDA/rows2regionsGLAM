@@ -1,8 +1,10 @@
 import copy
 import json
 import math
+import multiprocessing
 import os
-from multiprocessing import Pool, cpu_count
+import time
+from multiprocessing import cpu_count
 from pathlib import Path
 
 from rows2regionsGLAM.utils.loger import Loger
@@ -22,6 +24,8 @@ _worker_ds = None
 
 def _init_cache_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
     global _worker_ds
+    pid = os.getpid()
+    time.sleep((pid % 10) * 0.3)
     from rows2regionsGLAM.utils.coco_manager import COCOManager
     from rows2regionsGLAM.pred_processor import PredProcessor
     from rows2regionsGLAM.datasetloaders.base_line_dataset import GLAMDataset
@@ -126,19 +130,21 @@ class ExperimentRunner:
     @staticmethod
     def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train):
         total = len(dataset)
+        workers = min(cpu_count(), 4)
 
+        ctx = multiprocessing.get_context('spawn')
         try:
             from tqdm import tqdm
-            with Pool(
-                cpu_count(),
+            with ctx.Pool(
+                workers,
                 initializer=_init_cache_worker,
                 initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train),
             ) as pool:
                 for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
                     pass
         except ImportError:
-            with Pool(
-                cpu_count(),
+            with ctx.Pool(
+                workers,
                 initializer=_init_cache_worker,
                 initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train),
             ) as pool:
