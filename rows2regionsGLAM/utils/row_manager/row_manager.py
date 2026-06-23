@@ -3,18 +3,17 @@ from rows2regionsGLAM._row_compat import Row, ImageSegment
 import numpy as np
 class RowManager:
     def __init__(self, **conf):
-        if "loger" not in conf.keys():
-            raise Exception('Создайте и передайте логер "loger": Loger(path))')
-        else:
-            self.loger = conf['loger']
-        self.loger.time_log()
-        self.loger("Create RowManager")
+        self.loger = conf.get('loger', None)
+        if self.loger:
+            self.loger.time_log()
+            self.loger("Create RowManager")
 
         if "add_image" not in conf.keys(): 
             conf['add_image'] = True
             
         self.is_add_image = conf['add_image']
-        self.loger(f"Add image as row: {conf['add_image']}")
+        if self.loger:
+            self.loger(f"Add image as row: {conf['add_image']}")
 
 
     def get_row_array_from_json(self, json_pdf):

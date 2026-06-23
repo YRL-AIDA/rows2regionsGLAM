@@ -9,10 +9,7 @@ from pagerlib.dtypes import ImageSegment
 
 class PredProcessor:
     def __init__(self, **kwargs):
-        if 'loger' in kwargs:
-            self.loger = kwargs['loger']
-        else:
-            raise Exception("need loger")
+        self.loger = kwargs.get('loger', None)
         if 'pdf_manager' in kwargs:
             self.pdf_manager = kwargs['pdf_manager']
         else:

@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import os
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
 from rows2regionsGLAM.utils.loger import Loger
@@ -14,6 +15,20 @@ from rows2regionsGLAM.utils.imbalance import calculate_imbalance
 from rows2regionsGLAM.tokenizers import RowGLAMTokenizer
 from rows2regionsGLAM.pipeline import Pipeline
 from rows2regionsGLAM.models import get_loss, get_model, save_model
+
+
+def _cache_dataset_worker(idx, pdf_dir, coco_manager, cache_dir, is_train):
+    pred = PredProcessor(loger=None)
+    ds = GLAMDataset(
+        coco_manager=coco_manager,
+        default_index=0,
+        pred=pred,
+        cache_dir=cache_dir,
+        pdf_dir=pdf_dir,
+    )
+    if is_train:
+        ds.train()
+    ds[idx]
 
 
 class ExperimentRunner:
@@ -68,35 +83,55 @@ class ExperimentRunner:
 
     def _load_datasets(self, name, model_params):
         tokenizer = self._get_tokenizer(name, model_params)
-        pred_train = PredProcessor(loger=self.loger, coco_manager=self._coco_manager_train, tokenizer=tokenizer)
-        pred_test = PredProcessor(loger=self.loger, coco_manager=self._coco_manager_test, tokenizer=tokenizer)
-
         cache_dir = model_params.get("_cache_dir", self._cache_pdf)
+
         train_dataset = GLAMDataset(
             coco_manager=self._coco_manager_train,
             default_index=0,
-            pred=pred_train,
+            pred=PredProcessor(loger=self.loger, coco_manager=self._coco_manager_train, tokenizer=tokenizer),
             loger=self.loger,
             cache_dir=cache_dir,
             pdf_dir=self._train_dataset_path,
         )
-        N = len(train_dataset)
-        for i, _ in enumerate(train_dataset):
-            print(f"{(i + 1) / N * 100:4.2f} %", end="\r")
+        train_dataset.train()
+        self._cache_dataset_parallel(train_dataset, self._train_dataset_path,
+                                     self._coco_manager_train, cache_dir, is_train=True)
 
         test_dataset = GLAMDataset(
             coco_manager=self._coco_manager_test,
             default_index=0,
-            pred=pred_test,
+            pred=PredProcessor(loger=self.loger, coco_manager=self._coco_manager_test, tokenizer=tokenizer),
             loger=self.loger,
             cache_dir=cache_dir,
             pdf_dir=self._test_dataset_path,
         )
-        N = len(test_dataset)
-        for i, _ in enumerate(test_dataset):
-            print(f"{(i + 1) / N * 100:4.2f} %", end="\r")
+        test_dataset.train()
+        self._cache_dataset_parallel(test_dataset, self._test_dataset_path,
+                                     self._coco_manager_test, cache_dir, is_train=True)
 
         return {"train": train_dataset, "test": test_dataset}
+
+    @staticmethod
+    def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train):
+        from functools import partial
+
+        total = len(dataset)
+        func = partial(
+            _cache_dataset_worker,
+            pdf_dir=pdf_dir,
+            coco_manager=coco_manager,
+            cache_dir=cache_dir,
+            is_train=is_train,
+        )
+
+        try:
+            from tqdm import tqdm
+            with Pool(cpu_count()) as pool:
+                for _ in tqdm(pool.imap_unordered(func, range(total)), total=total):
+                    pass
+        except ImportError:
+            with Pool(cpu_count()) as pool:
+                pool.map(func, range(total))
 
     def _build_model(self, name, model_params):
         if self._model_factory:

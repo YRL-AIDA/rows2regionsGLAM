@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
-from json import JSONEncoder 
+from json import JSONEncoder
+import os
 import torch
 from torch.utils.data import Dataset
 import warnings
@@ -37,6 +38,8 @@ class Cacher:
             return res
         
         data = self.cache_fun(unic_name)
-        with open(path_file, "w") as f:
+        tmp = path_file.with_suffix(".tmp")
+        with open(tmp, "w") as f:
             json.dump(data, f, cls=EncodeTensor)
+        os.rename(tmp, path_file)
         return data

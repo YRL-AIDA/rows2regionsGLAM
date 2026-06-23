@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Построение кеша датасета через GLAMDataset.init().
+Построение кеша датасета через multiprocessing Pool.
 При --verify сравнивает parser-стабильные поля (N, X, Y, inds)
 с эталонным кешем debug_data — проверка, что pagerlib выдаёт
 идентичный результат на сервере и локальной машине.
@@ -13,6 +13,8 @@ import argparse
 import json
 import os
 import sys
+from functools import partial
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -26,6 +28,20 @@ from rows2regionsGLAM.pred_processor import PredProcessor
 from rows2regionsGLAM.datasetloaders.base_line_dataset import GLAMDataset
 
 PARSER_KEYS = ['N', 'X', 'Y', 'inds']
+
+
+def _build_cache_worker(idx, pdf_dir, coco_manager, cache_dir, is_train):
+    pred = PredProcessor(loger=None)
+    ds = GLAMDataset(
+        coco_manager=coco_manager,
+        default_index=0,
+        pred=pred,
+        cache_dir=cache_dir,
+        pdf_dir=pdf_dir,
+    )
+    if is_train:
+        ds.train()
+    ds[idx]
 
 
 def _resolve(value):
@@ -128,7 +144,25 @@ def build(env_path, mode, verify_path):
     print()
 
     dataset.train()
-    dataset.init()
+    total = len(dataset)
+
+    func = partial(
+        _build_cache_worker,
+        pdf_dir=pdf_dir,
+        coco_manager=coco_manager,
+        cache_dir=cache_dir,
+        is_train=(mode == 'train'),
+    )
+
+    try:
+        from tqdm import tqdm
+        with Pool(cpu_count()) as pool:
+            for _ in tqdm(pool.imap_unordered(func, range(total)), total=total):
+                pass
+    except ImportError:
+        with Pool(cpu_count()) as pool:
+            pool.map(func, range(total))
+
     print()
 
     if not debug_refs:

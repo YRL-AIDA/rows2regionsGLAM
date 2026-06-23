@@ -3,16 +3,14 @@ from pagerlib.dtypes import ImageSegment
 
 class COCOManager:
     def __init__(self, **conf):
-        if "loger" not in conf.keys():
-            raise Exception('Создайте и передайте логер "loger": Loger(path))')
-        else:
-            self.loger = conf['loger']
+        self.loger = conf.get('loger', None)
         if "name_dataset" not in conf.keys() or not conf['name_dataset'] in ("doclaynet", "publaynet"):
             raise Exception('Передайте имя датасета "name_dataset": str ("doclaynet", "publaynet")')
         self.name_dataset = conf['name_dataset']
 
-        self.loger("COCOManager")
-        self.loger.time_log()
+        if self.loger:
+            self.loger("COCOManager")
+            self.loger.time_log()
 
         if "coco_path" not in conf.keys():
             raise Exception('Создайте и путь coco_path": path.json)')
@@ -52,7 +50,8 @@ class COCOManager:
             else:
                 pdf_ann[pdf_name] = {'regions': [get_info(an)]}
 
-        self.loger(str(coco['categories']))
+        if self.loger:
+            self.loger(str(coco['categories']))
 
         coco_classes = {}
         for cat in coco['categories']:

@@ -8,11 +8,9 @@ from multiprocessing import Process, Queue
 
 class PDFManager:
     def __init__(self, **conf):
-        if "loger" not in conf.keys():
-            raise Exception('Создайте и передайте логер "loger": Loger(path))')
-        else:
-            self.loger = conf['loger']
-        self.loger.time_log()
+        self.loger = conf.get('loger', None)
+        if self.loger:
+            self.loger.time_log()
 
         if "pdf_reader" not in conf.keys(): 
             conf['pdf_reader'] = "PDFMiner"
@@ -20,11 +18,11 @@ class PDFManager:
             self.pdf_reader = FileInput()
         elif conf['pdf_reader'] == "PrecisionPDF":
             raise Exception('На данный момент PrecisionPDF не реализован')
-            # self.pdf_reader = PrecisionPDFModel()
         else:
             raise Exception('Неверный способ чтения ("pdf_reader": "PDFMiner" or "PrecisionPDF")')
 
-        self.loger(f"PDF Reader: {conf['pdf_reader']}")
+        if self.loger:
+            self.loger(f"PDF Reader: {conf['pdf_reader']}")
 
         self.img_extract = PDFIMGExtractor()
     

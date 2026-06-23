@@ -17,17 +17,19 @@ from pagerlib.dtypes import ImageSegment
 class GLAMDataset(Dataset):
     def __init__(self, **conf):
         if "loger" not in conf.keys():
-            raise Exception('Создайте и передайте логер "loger": Loger(path))')
+            self.loger = None
         else:
             self.loger = conf['loger']
-        self.loger.time_log()
-        self.loger("Create Dataset")
+        if self.loger:
+            self.loger.time_log()
+            self.loger("Create Dataset")
 
         if "pdf_dir" in conf.keys(): 
             self.pdf_dir  = Path(conf["pdf_dir"])
         else:
             raise Exception('Укажите папку до pdf файлов ("pdf_dir": path)')
-        self.loger(f"Path Dataset: {self.pdf_dir}")
+        if self.loger:
+            self.loger(f"Path Dataset: {self.pdf_dir}")
         
         if "coco_manager" in conf.keys(): 
             self.coco_manager = conf['coco_manager']
@@ -68,7 +70,6 @@ class GLAMDataset(Dataset):
 
     def pdf2json_for_model(self, name_file):
         try:
-            print(name_file)
             rez  = self.pred(self.pdf_dir/name_file)
             torch_dict = rez['torch_dict']
             
@@ -147,17 +148,21 @@ class GLAMDataset(Dataset):
             
             if len(key_error) != 0:
                 print("KEY ERROR FILES:")
-                self.loger("KEY ERROR FILES:")
+                if self.loger:
+                    self.loger("KEY ERROR FILES:")
                 for i in key_error:
                     print(files[i])
-                    self.loger(files[i])
+                    if self.loger:
+                        self.loger(files[i])
 
             if len(json_error) != 0:
                 print("JSON ERROR FILES:")
-                self.loger("JSON ERROR FILES:")
+                if self.loger:
+                    self.loger("JSON ERROR FILES:")
                 for i in json_error:
                     print(files[i])
-                    self.loger(files[i])
+                    if self.loger:
+                        self.loger(files[i])
             error_file = sorted(key_error + json_error, reverse=True)
             with open("error_list_file.txt", "w") as f:
                 for i in error_file:
