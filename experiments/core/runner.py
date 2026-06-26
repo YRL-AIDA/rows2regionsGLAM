@@ -91,27 +91,34 @@ class ExperimentRunner:
 
     def _run_one(self, name, model_params):
         datasets = self._load_datasets(name, model_params)
-        model_info = self._build_model(name, model_params)
-        if "model_params" in model_info:
-            self._train(model_info, datasets["train"], model_params)
+        if datasets["train"] is not None:
+            model_info = self._build_model(name, model_params)
+            if "model_params" in model_info:
+                self._train(model_info, datasets["train"], model_params)
+        else:
+            model_info = self._build_model(name, model_params)
         result = self._test(name, model_info, datasets, model_params)
         return result
 
     def _load_datasets(self, name, model_params):
         tokenizer = self._get_tokenizer(name, model_params)
         cache_dir = model_params.get("_cache_dir", self._cache_pdf)
+        test_only = model_params.get("_test_only", False)
 
-        train_dataset = GLAMDataset(
-            coco_manager=self._coco_manager_train,
-            default_index=0,
-            pred=PredProcessor(loger=self.loger, coco_manager=self._coco_manager_train, tokenizer=tokenizer),
-            loger=self.loger,
-            cache_dir=cache_dir,
-            pdf_dir=self._train_dataset_path,
-        )
-        train_dataset.train()
-        self._cache_dataset_parallel(train_dataset, self._train_dataset_path,
-                                     self._coco_manager_train, cache_dir, is_train=True)
+        if not test_only:
+            train_dataset = GLAMDataset(
+                coco_manager=self._coco_manager_train,
+                default_index=0,
+                pred=PredProcessor(loger=self.loger, coco_manager=self._coco_manager_train, tokenizer=tokenizer),
+                loger=self.loger,
+                cache_dir=cache_dir,
+                pdf_dir=self._train_dataset_path,
+            )
+            train_dataset.train()
+            self._cache_dataset_parallel(train_dataset, self._train_dataset_path,
+                                         self._coco_manager_train, cache_dir, is_train=True)
+        else:
+            train_dataset = None
 
         test_dataset = GLAMDataset(
             coco_manager=self._coco_manager_test,

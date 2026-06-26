@@ -68,13 +68,14 @@ def tokenizer_factory(name, params):
     return get_dg_tokenizer(params.get("name_tok", "glam"))
 
 
-runner = ExperimentRunner(
-    "result",
-    model_factory=model_factory,
-    get_tokenizer=tokenizer_factory,
-    tester_factory=tester_factory,
-)
-runner.run({
-    name_tok: {"name_tok": name_tok, "_cache_dir": f"tmp_diff_graphs_{name_tok}", "debug_render": False}
-    for name_tok in ["glam", "all"]
-})
+if __name__ == '__main__':
+    runner = ExperimentRunner(
+        "result",
+        model_factory=model_factory,
+        get_tokenizer=tokenizer_factory,
+        tester_factory=tester_factory,
+    )
+    runner.run({
+        name_tok: {"name_tok": name_tok, "_cache_dir": f"tmp_diff_graphs_{name_tok}", "_test_only": True, "debug_render": False}
+        for name_tok in ["glam", "all"]
+    })
