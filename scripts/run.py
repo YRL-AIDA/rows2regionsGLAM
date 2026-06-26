@@ -9,7 +9,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-PYTHON_BIN = os.environ.get("PYTHON_BIN", "/Users/macbookair/program/python/PageR/env/bin/python")
+PYTHON_BIN_DEFAULT = "/Users/macbookair/program/python/PageR/env/bin/python"
 
 from dotenv import dotenv_values
 from scripts.configs import resolve_env_file, write_dotenv, ENV_TEMPLATES
@@ -39,7 +39,9 @@ def run_experiment(experiment, env_path):
         pythonpath = f"{pythonpath}:{merged_env['PYTHONPATH']}"
     merged_env["PYTHONPATH"] = pythonpath
 
-    subprocess.run([PYTHON_BIN, str(start_script)], env=merged_env, cwd=str(PROJECT_ROOT))
+    python_bin = merged_env.get("PYTHON_BIN", PYTHON_BIN_DEFAULT)
+
+    subprocess.run([python_bin, str(start_script)], env=merged_env, cwd=str(PROJECT_ROOT))
 
     src_csv = PROJECT_ROOT / 'result' / 'results.csv'
     if src_csv.exists():
