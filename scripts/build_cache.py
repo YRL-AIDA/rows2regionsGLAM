@@ -13,6 +13,7 @@ import argparse
 import json
 import multiprocessing
 import os
+import signal
 import sys
 import time
 from multiprocessing import cpu_count
@@ -29,13 +30,19 @@ from rows2regionsGLAM.pred_processor import PredProcessor
 from rows2regionsGLAM.datasetloaders.base_line_dataset import GLAMDataset
 
 PARSER_KEYS = ['N', 'X', 'Y', 'inds']
+CACHE_TIMEOUT = 60
 
 
 _worker_ds = None
 
 
+def _timeout_handler(signum, frame):
+    raise TimeoutError("cache timeout")
+
+
 def _init_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
     global _worker_ds
+    signal.signal(signal.SIGALRM, _timeout_handler)
     pid = os.getpid()
     time.sleep((pid % 10) * 0.3)
     coco_manager = COCOManager(loger=None, coco_path=coco_path, name_dataset=name_dataset)
@@ -52,7 +59,14 @@ def _init_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
 
 
 def _cache_one(idx):
-    _worker_ds[idx]
+    signal.alarm(CACHE_TIMEOUT)
+    try:
+        _worker_ds[idx]
+    except TimeoutError:
+        name = _worker_ds.pdf_names[idx]
+        print(f"SKIP (timeout >{CACHE_TIMEOUT}s): {name}")
+    finally:
+        signal.alarm(0)
 
 
 def _resolve(value):
