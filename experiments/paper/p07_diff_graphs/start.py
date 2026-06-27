@@ -78,6 +78,9 @@ def _oracle_one(pdf_name):
     except TimeoutError:
         print(f"SKIP (timeout >{ORACLE_TIMEOUT}s): {pdf_name}")
         return None
+    except Exception as e:
+        print(f"SKIP (error): {pdf_name} — {e}")
+        return None
     finally:
         signal.alarm(0)
 
