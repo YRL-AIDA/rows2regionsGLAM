@@ -3,10 +3,14 @@ import json
 import math
 import multiprocessing
 import os
+import random
 import signal
 import time
 from multiprocessing import cpu_count
 from pathlib import Path
+
+import numpy as np
+import torch
 
 from rows2regionsGLAM.utils.loger import Loger
 from rows2regionsGLAM.utils.coco_manager import COCOManager
@@ -199,6 +203,14 @@ class ExperimentRunner:
 
         params["node_classifier_block"]["linear_post"][-1]["activation"] = "none"
         params["edge_classifier_block"]["linear_post"][-1]["activation"] = "none"
+
+        seed = params.get("seed")
+        if seed is not None:
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            random.seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
 
         model, num_restart = get_model(params, model_name)
         params["restart_num"] = num_restart

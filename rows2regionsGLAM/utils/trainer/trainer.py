@@ -43,13 +43,15 @@ class Trainer:
     def _validation(self, model, batch, criterion):     
         return self._step(model, batch, optimizer=None, criterion=criterion, train=False)
 
-    def _split_index_train_val(self, dataset, val_split=0.2, shuffle=True, seed=1234,batch_size=64):
+    def _split_index_train_val(self, dataset, val_split=0.2, shuffle=True, seed=None, batch_size=64):
         N = len(dataset)
         count_batchs = int(N*(1-val_split))//batch_size
         count_val_batch = int(N*(val_split))//batch_size
         train_size = count_batchs * batch_size 
         indexs = [i for i in range(N)]
         if shuffle:
+            if seed is not None:
+                np.random.seed(seed)
             np.random.shuffle(indexs)
         train_indexs = indexs[:train_size]
         val_indexs = indexs[train_size:]
@@ -108,7 +110,7 @@ class Trainer:
 
         loss_list = []
         start = time.time()
-        train_dataset, val_dataset = self._split_index_train_val(dataset, val_split=0.1, batch_size=batch_size)
+        train_dataset, val_dataset = self._split_index_train_val(dataset, val_split=0.1, batch_size=batch_size, seed=self.train_param.get("seed"))
         for k in range(start_epoch, count_epochs):
             my_loss_list = []
             if k == start_epoch:

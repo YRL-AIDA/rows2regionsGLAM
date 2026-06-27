@@ -54,6 +54,7 @@ def default_arch(
     seg_k=0.5,
     edge_coef=0.8,
     save_frequency=None,
+    seed=None,
 ):
     node_coef = 1.0 - edge_coef
     gnn_first_in = hidden_dim if has_lp else input_dim
@@ -89,6 +90,9 @@ def default_arch(
 
     if save_frequency is not None:
         params["save_frequency"] = save_frequency
+
+    if seed is not None:
+        params["seed"] = seed
 
     if has_post_node:
         post_concat_in = concat_node_out
