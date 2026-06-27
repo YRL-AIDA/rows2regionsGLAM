@@ -8,6 +8,22 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 from rows2regionsGLAM.utils.tester.metrics_per_class import classification_metrics_iou, classification_metrics_grid
 
+
+def get_bbox(segment, resize=None, delta_w=0, delta_h=0):
+    coef_w, coef_h = 1, 1
+    if resize:
+        coef_w, coef_h = resize
+    if "height" not in segment:
+        segment['width'] = segment['x_bottom_right'] - segment['x_top_left']
+        segment['height'] = segment['y_bottom_right'] - segment['y_top_left']
+    return [
+        int(coef_w * segment['x_top_left'] - delta_w),
+        int(coef_h * segment['y_top_left'] - delta_h),
+        int(coef_w * segment['width'] + delta_w),
+        int(coef_h * segment['height'] + delta_h),
+    ]
+
+
 class Tester:
     def __init__(self, **conf):
         if "loger" not in conf.keys():
@@ -30,18 +46,7 @@ class Tester:
         self.data = None
 
     def get_bbox(self, segment, resize=None, delta_w=0, delta_h=0):
-        coef_w, coef_h = 1, 1
-        if resize:
-            coef_w, coef_h = resize
-        if not "height" in segment:
-            segment['width'] = segment['x_bottom_right'] - segment['x_top_left']
-            segment['height'] = segment['y_bottom_right'] - segment['y_top_left']
-        return [
-            int(coef_w * segment['x_top_left'] - delta_w),
-            int(coef_h * segment['y_top_left'] - delta_h),
-            int(coef_w * segment['width'] + delta_w),
-            int(coef_h * segment['height'] + delta_h)
-        ]
+        return get_bbox(segment, resize=resize, delta_w=delta_w, delta_h=delta_h)
 
     def clean_rows(self, rows, bboxes_true):
         def is_row_in_region(row, segs_regions):
@@ -64,10 +69,6 @@ class Tester:
                 new_rows.append(old_rows[i])
         rows.clear()
         rows.extend(new_rows)
-
-   
-
-
 
     def calculate(self):
         target = []
@@ -102,7 +103,6 @@ class Tester:
                 
             except Exception as e:
                 print(e)
-                # print(i,d["file_name"])
 
             print(f"{(i + 1) / N * 100:4.2f} %", end='\r')
 
