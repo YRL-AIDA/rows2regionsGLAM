@@ -7,6 +7,6 @@ if __name__ == '__main__':
     EPOCHS = int(os.environ.get("EPOCHS", "30"))
     runner = ExperimentRunner("result")
     runner.run({
-        f"count_gnn_{n}": default_arch(num_layers=n, epochs=EPOCHS)
+        f"count_gnn_{n}": default_arch(num_layers=n, epochs=EPOCHS, early_stopping_patience=3)
         for n in [1, 2, 3, 4]
     })

@@ -17,6 +17,6 @@ if __name__ == '__main__':
 
     runner = ExperimentRunner("result", get_tokenizer=get_tokenizer)
     runner.run({
-        "font": {**default_arch(input_dim=527, epochs=EPOCHS), "_cache_dir": "tmp_feature_font"},
-        "no_font": {**default_arch(input_dim=15, epochs=EPOCHS), "_cache_dir": "tmp_feature_no_font"},
+        "font": {**default_arch(input_dim=527, epochs=EPOCHS, early_stopping_patience=3), "_cache_dir": "tmp_feature_font"},
+        "no_font": {**default_arch(input_dim=15, epochs=EPOCHS, early_stopping_patience=3), "_cache_dir": "tmp_feature_no_font"},
     })

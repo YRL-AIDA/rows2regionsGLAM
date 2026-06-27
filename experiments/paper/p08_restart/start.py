@@ -7,6 +7,6 @@ if __name__ == '__main__':
     EPOCHS = int(os.environ.get("EPOCHS", "30"))
     runner = ExperimentRunner("result")
     runner.run({
-        f"seed_{i}": default_arch(epochs=EPOCHS, save_frequency=5, seed=i)
+        f"seed_{i}": default_arch(epochs=EPOCHS, early_stopping_patience=3, seed=i)
         for i in range(10)
     })

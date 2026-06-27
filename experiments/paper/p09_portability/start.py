@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     def model_factory(name, params):
         _, _, _, _, _, num_cls = DS_INFO[params["train_ds"]]
-        model_params = default_arch(num_classes=num_cls, epochs=EPOCHS, batch_size=128, save_frequency=10)
+        model_params = default_arch(num_classes=num_cls, epochs=EPOCHS, batch_size=128, early_stopping_patience=3)
         model_name = str(Path("result", f"row2region_GLAM_{params['train_ds']}"))
         return {"model_name": model_name, "model_params": model_params}
 

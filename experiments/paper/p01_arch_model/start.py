@@ -17,6 +17,7 @@ if __name__ == '__main__':
             has_post_node=t != "base",
             has_lp=l == "lp",
             epochs=EPOCHS,
+            early_stopping_patience=3,
         )
         for ((_, t), (_, c), (_, l)) in grid
     })

@@ -55,6 +55,7 @@ def default_arch(
     edge_coef=0.8,
     save_frequency=None,
     seed=None,
+    early_stopping_patience=None,
 ):
     node_coef = 1.0 - edge_coef
     gnn_first_in = hidden_dim if has_lp else input_dim
@@ -93,6 +94,9 @@ def default_arch(
 
     if seed is not None:
         params["seed"] = seed
+
+    if early_stopping_patience is not None:
+        params["early_stopping_patience"] = early_stopping_patience
 
     if has_post_node:
         post_concat_in = concat_node_out

@@ -11,6 +11,7 @@ if __name__ == '__main__':
             learning_rate=lr,
             batch_size=bs,
             epochs=EPOCHS,
+            early_stopping_patience=3,
         )
         for lr in [0.01, 0.005, 0.001, 0.0005]
         for bs in [1, 8, 64, 128]

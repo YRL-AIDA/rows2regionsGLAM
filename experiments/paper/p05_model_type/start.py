@@ -21,5 +21,5 @@ if __name__ == '__main__':
 
     runner = ExperimentRunner("result")
     runner.run({
-        "main": default_arch(epochs=EPOCHS),
+        "main": default_arch(epochs=EPOCHS, early_stopping_patience=3),
     })
