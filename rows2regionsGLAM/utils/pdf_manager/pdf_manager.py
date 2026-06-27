@@ -1,9 +1,15 @@
-# from pager.doc_model import MinerPDFModel, PrecisionPDFModel
-# from pager import PDF2Img, ImageModel, PDFModel
+import signal
 
 from pagerlib.file_input import FileInput
 from pagerlib.extractors.page_extractor import PDFIMGExtractor, FontEmbExtractor
-from multiprocessing import Process, Queue
+
+
+class _PDFTimeoutError(Exception):
+    pass
+
+
+def _pdf_alarm_handler(signum, frame):
+    raise _PDFTimeoutError("PDF reading timeout (>120s)")
 
 
 class PDFManager:
@@ -33,31 +39,15 @@ class PDFManager:
         
         return row.to_dict()
 
-    def read_pdf(self, pdf_path):        
-        # result_queue = Queue()
-
-        # def pdf_reader_wrapper(pdf_path, queue):
-        #     result = self.pdf_reader(pdf_path) 
-        #     queue.put(result) 
-        # p = Process(target=pdf_reader_wrapper, args=(pdf_path, result_queue))
-        # p.start()
-        # p.join(timeout=30)  # Ожидаем выполнение не более 10 секунд
-        
-        # result = None
-        # if p.is_alive():
-        #     # Если процесс все еще работает - принудительно завершаем
-        #     p.terminate()
-        #     p.join()  # Ждем завершения terminate
-        #     print(f"Функция read_pdf для файла {pdf_path} превысила лимит времени 30 секунд")
-        # else:
-        #     # Если процесс успешно завершился, получаем результат
-        #     try:
-        #         result = result_queue.get_nowait()
-        #     except:
-        #         # Очередь пуста - что-то пошло не так
-        #         pass
-        result = self.pdf_reader(pdf_path) 
-        return result
+    def read_pdf(self, pdf_path):
+        old_handler = signal.signal(signal.SIGALRM, _pdf_alarm_handler)
+        signal.alarm(120)
+        try:
+            result = self.pdf_reader(pdf_path)
+            return result
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
     
     def get_json_from_pdf(self, pdf_path, num_page=0):
         prdf = self.read_pdf(pdf_path)
@@ -72,7 +62,14 @@ class PDFManager:
             prdf = self.read_pdf(pdf_path)
             self.img_extract.extract(prdf)
             page = prdf.data['pages'][num_page]
+        except _PDFTimeoutError:
+            with open('failed_pdfs.log', 'a') as log:
+                log.write(f"TIMEOUT\t{pdf_path}\n")
+            print(f"TIMEOUT >120s: {pdf_path}")
+            return {}, None
         except Exception as e:
+            with open('failed_pdfs.log', 'a') as log:
+                log.write(f"ERROR\t{pdf_path}\t{e}\n")
             print('error in PDFManager', e)
             print(pdf_path)
             return {}, None

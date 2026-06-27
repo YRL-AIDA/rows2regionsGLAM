@@ -12,8 +12,14 @@ class COCOManager:
             self.loger("COCOManager")
             self.loger.time_log()
 
+        if "regions" in conf and "classes" in conf:
+            self.regions = conf['regions']
+            self.classes = conf['classes']
+            self.coco_classes = self.classes
+            return
+
         if "coco_path" not in conf.keys():
-            raise Exception('Создайте и путь coco_path": path.json)')
+            raise Exception('Создайте путь coco_path": path.json)')
         else:
             self.coco_path = conf['coco_path']
         self.regions, self.classes = self.get_regions_from_json()

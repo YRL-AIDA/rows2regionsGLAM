@@ -82,6 +82,8 @@ class GLAMDataset(Dataset):
             
             del torch_dict['sp_A']
         except Exception as e:
+            with open('failed_pdfs.log', 'a') as log:
+                log.write(f"DATASET\t{name_file}\t{e}\n")
             print(f"ERROR in {name_file}: {e}")
             return {}
         return torch_dict

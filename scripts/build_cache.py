@@ -15,8 +15,9 @@ import multiprocessing
 import os
 import signal
 import sys
+import threading
 import time
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Manager
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -34,18 +35,21 @@ CACHE_TIMEOUT = 60
 
 
 _worker_ds = None
+_worker_status = None
 
 
 def _timeout_handler(signum, frame):
     raise TimeoutError("cache timeout")
 
 
-def _init_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
-    global _worker_ds
+def _init_worker(pdf_dir, shared_regions, shared_classes, name_dataset, cache_dir, is_train, worker_status):
+    global _worker_ds, _worker_status
+    _worker_status = worker_status
     signal.signal(signal.SIGALRM, _timeout_handler)
     pid = os.getpid()
-    time.sleep((pid % 10) * 0.3)
-    coco_manager = COCOManager(loger=None, coco_path=coco_path, name_dataset=name_dataset)
+    time.sleep((pid % 10) * 2.0)
+    coco_manager = COCOManager(loger=None, regions=shared_regions,
+                                classes=shared_classes, name_dataset=name_dataset)
     pred = PredProcessor(loger=None)
     _worker_ds = GLAMDataset(
         coco_manager=coco_manager,
@@ -59,14 +63,42 @@ def _init_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
 
 
 def _cache_one(idx):
+    pid = os.getpid()
+    name = _worker_ds.pdf_names[idx]
+    if _worker_status is not None:
+        _worker_status[pid] = (name, time.time(), idx)
     signal.alarm(CACHE_TIMEOUT)
     try:
         _worker_ds[idx]
     except TimeoutError:
-        name = _worker_ds.pdf_names[idx]
         print(f"SKIP (timeout >{CACHE_TIMEOUT}s): {name}")
     finally:
         signal.alarm(0)
+        if _worker_status is not None:
+            try:
+                del _worker_status[pid]
+            except KeyError:
+                pass
+
+
+def _watchdog(worker_status, stop_event, pbar):
+    while not stop_event.is_set():
+        stop_event.wait(10)
+        now = time.time()
+        stuck = []
+        status_parts = []
+        for pid, item in list(worker_status.items()):
+            if item is None:
+                continue
+            name, t0, idx = item
+            elapsed = now - t0
+            status_parts.append(f"[{pid}] {name} {elapsed:.0f}s")
+            if elapsed > 120:
+                stuck.append(f"WORKER {pid} STUCK {elapsed:.0f}s: {name} (#{idx})")
+        if pbar is not None and status_parts:
+            pbar.set_postfix_str(" | ".join(status_parts))
+        for s in stuck:
+            pbar.write(s)
 
 
 def _resolve(value):
@@ -170,25 +202,66 @@ def build(env_path, mode, verify_path):
 
     dataset.train()
     total = len(dataset)
-    workers = min(cpu_count(), 4)
 
+    cached = len(list(Path(cache_dir).glob("*.json")))
+    pct = cached / total * 100 if total > 0 else 0
+    print(f"Cached:    {cached}/{total} ({pct:.1f}%)")
+    print(f"Remaining: {total - cached}")
+    print()
+
+    workers = min(cpu_count(), 4)
     ctx = multiprocessing.get_context('spawn')
+    manager = Manager()
+    worker_status = manager.dict()
+    stop_watchdog = threading.Event()
+
+    shared_regions = manager.dict()
+    for k, v in coco_manager.regions.items():
+        shared_regions[k] = v
+    shared_classes = manager.dict()
+    for k, v in coco_manager.classes.items():
+        shared_classes[k] = v
+
+    watchdog_thread = None
+    pbar = None
     try:
         from tqdm import tqdm
+
+        pbar = tqdm(total=total)
+        watchdog_thread = threading.Thread(
+            target=_watchdog, args=(worker_status, stop_watchdog, pbar), daemon=True
+        )
+        watchdog_thread.start()
+
         with ctx.Pool(
             workers,
             initializer=_init_worker,
-            initargs=(pdf_dir, coco_path, name, cache_dir, mode == 'train'),
+            initargs=(pdf_dir, shared_regions, shared_classes, name,
+                      cache_dir, mode == 'train', worker_status),
         ) as pool:
-            for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
-                pass
+            for _ in pool.imap_unordered(_cache_one, range(total)):
+                pbar.update(1)
+
     except ImportError:
+        watchdog_thread = threading.Thread(
+            target=_watchdog, args=(worker_status, stop_watchdog, None), daemon=True
+        )
+        watchdog_thread.start()
+
         with ctx.Pool(
             workers,
             initializer=_init_worker,
-            initargs=(pdf_dir, coco_path, name, cache_dir, mode == 'train'),
+            initargs=(pdf_dir, shared_regions, shared_classes, name,
+                      cache_dir, mode == 'train', worker_status),
         ) as pool:
             pool.map(_cache_one, range(total))
+
+    finally:
+        stop_watchdog.set()
+        if watchdog_thread is not None:
+            watchdog_thread.join(timeout=2)
+        if pbar is not None:
+            pbar.close()
 
     print()
 
