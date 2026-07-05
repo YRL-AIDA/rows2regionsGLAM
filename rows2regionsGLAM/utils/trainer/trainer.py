@@ -46,18 +46,23 @@ class Trainer:
 
     def _split_index_train_val(self, dataset, val_split=0.2, shuffle=True, seed=None, batch_size=64):
         N = len(dataset)
-        count_batchs = int(N*(1-val_split))//batch_size
-        count_val_batch = int(N*(val_split))//batch_size
-        train_size = count_batchs * batch_size 
         indexs = [i for i in range(N)]
         if shuffle:
             if seed is not None:
                 np.random.seed(seed)
             np.random.shuffle(indexs)
+        train_size = int(N * (1 - val_split))
         train_indexs = indexs[:train_size]
         val_indexs = indexs[train_size:]
-        batchs_train_indexs = [[train_indexs[k*batch_size+i] for i in range(batch_size)] for k in range(count_batchs)]
-        batchs_val_indexs = [[val_indexs[k*batch_size+i] for i in range(batch_size)] for k in range(count_val_batch)]
+
+        if train_size == 0:
+            return [], []
+
+        batch_size = min(batch_size, train_size)
+        count_batchs = max(1, train_size // batch_size)
+        count_val_batch = max(1, len(val_indexs) // batch_size) if val_indexs else 0
+        batchs_train_indexs = [[train_indexs[(k * batch_size + i) % train_size] for i in range(batch_size)] for k in range(count_batchs)]
+        batchs_val_indexs = [[val_indexs[(k * batch_size + i) % len(val_indexs)] for i in range(min(batch_size, len(val_indexs)))] for k in range(count_val_batch)] if val_indexs else []
         return batchs_train_indexs, batchs_val_indexs    
 
     def _step(self, model: torch.nn.Module, batch, optimizer, criterion, train=True):
@@ -131,7 +136,7 @@ class Trainer:
                 print(f"Batch # {l+1} loss={my_loss_list[-1]:.4f}" + " "*40, end='\r')
                 if (k == start_epoch and l==0):
                     print(f"Время обучения batch'а {time.time()-start:.2f} сек")
-            train_val = np.mean(my_loss_list)
+            train_val = np.mean(my_loss_list) if my_loss_list else float('nan')
 
             model.eval()
             my_loss_list = []
@@ -140,7 +145,7 @@ class Trainer:
                 batch_loss = self._validation(model, batch, criterion)
                 my_loss_list.append(batch_loss)
                 print(f"Batch # {l+1} loss={my_loss_list[-1]:.4f}" + " "*40, end='\r')
-            validation_val =  np.mean(my_loss_list)
+            validation_val =  np.mean(my_loss_list) if my_loss_list else float('nan')
             print("="*10, f"EPOCH #{k+1}","="*10, f"({train_val:.4f}/{validation_val:.4f})")
             if k == start_epoch:
                 print(f"Время обучения epoch {time.time()-start:.2f} сек")    

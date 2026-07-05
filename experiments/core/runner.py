@@ -32,7 +32,7 @@ def _timeout_handler(signum, frame):
     raise TimeoutError("cache timeout")
 
 
-def _init_cache_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
+def _init_cache_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train, tokenizer):
     global _worker_ds
     signal.signal(signal.SIGALRM, _timeout_handler)
     pid = os.getpid()
@@ -42,7 +42,7 @@ def _init_cache_worker(pdf_dir, coco_path, name_dataset, cache_dir, is_train):
     from rows2regionsGLAM.datasetloaders.base_line_dataset import GLAMDataset
 
     coco_manager = COCOManager(loger=None, coco_path=coco_path, name_dataset=name_dataset)
-    pred = PredProcessor(loger=None)
+    pred = PredProcessor(loger=None, tokenizer=tokenizer)
     _worker_ds = GLAMDataset(
         coco_manager=coco_manager,
         default_index=0,
@@ -134,7 +134,7 @@ class ExperimentRunner:
             )
             train_dataset.train()
             self._cache_dataset_parallel(train_dataset, self._train_dataset_path,
-                                         self._coco_manager_train, cache_dir, is_train=True)
+                                         self._coco_manager_train, cache_dir, is_train=True, tokenizer=tokenizer)
         else:
             train_dataset = None
 
@@ -148,12 +148,12 @@ class ExperimentRunner:
         )
         test_dataset.train()
         self._cache_dataset_parallel(test_dataset, self._test_dataset_path,
-                                     self._coco_manager_test, cache_dir, is_train=True)
+                                     self._coco_manager_test, cache_dir, is_train=True, tokenizer=tokenizer)
 
         return {"train": train_dataset, "test": test_dataset}
 
     @staticmethod
-    def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train):
+    def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train, tokenizer):
         total = len(dataset)
         workers = min(cpu_count(), 4)
 
@@ -163,7 +163,7 @@ class ExperimentRunner:
             with ctx.Pool(
                 workers,
                 initializer=_init_cache_worker,
-                initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train),
+                initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train, tokenizer),
             ) as pool:
                 for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
                     pass
@@ -171,7 +171,7 @@ class ExperimentRunner:
             with ctx.Pool(
                 workers,
                 initializer=_init_cache_worker,
-                initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train),
+                initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train, tokenizer),
             ) as pool:
                 pool.map(_cache_one, range(total))
 

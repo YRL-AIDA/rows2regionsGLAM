@@ -15,9 +15,12 @@ if __name__ == '__main__':
     def get_tokenizer(name, params):
         if name.startswith("font_emb"):
             return emb_font_tokenizer
-        if name.startswith("pdf_font"):
+        elif name.startswith("pdf_font"):
             return pdf_font_tokenizer
-        return no_font_tokenizer
+        elif name.startswith("no_font"):
+            return no_font_tokenizer
+        else:
+            raise ValueError(f"Unknown tokenizer for config name: {name}")
 
     configs = {}
     for seed in range(3):

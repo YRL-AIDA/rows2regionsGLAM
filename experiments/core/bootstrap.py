@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 _path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if _path not in sys.path:
-    sys.path.insert(0, _path)
+    sys.path.append(_path)
 
 
 def init():
