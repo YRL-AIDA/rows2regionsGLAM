@@ -176,12 +176,6 @@ class ExperimentRunner:
     @staticmethod
     def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train, tokenizer):
         total = len(dataset)
-        cache_path = Path(cache_dir)
-
-        missing = [i for i in range(total) if not (cache_path / f"{dataset.pdf_names[i]}.json").exists()]
-        if not missing:
-            return
-
         workers = min(cpu_count(), 4)
 
         ctx = multiprocessing.get_context('spawn')
@@ -192,7 +186,7 @@ class ExperimentRunner:
                 initializer=_init_cache_worker,
                 initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train, tokenizer),
             ) as pool:
-                for _ in tqdm(pool.imap_unordered(_cache_one, missing), total=len(missing)):
+                for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
                     pass
         except ImportError:
             with ctx.Pool(
@@ -200,7 +194,7 @@ class ExperimentRunner:
                 initializer=_init_cache_worker,
                 initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train, tokenizer),
             ) as pool:
-                pool.map(_cache_one, missing)
+                pool.map(_cache_one, range(total))
 
     def _build_model(self, name, model_params):
         if self._model_factory:
