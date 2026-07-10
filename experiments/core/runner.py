@@ -99,6 +99,20 @@ class ExperimentRunner:
             name_dataset=self._test_dataset_name,
         )
 
+        self._datasets_cache = {}
+
+    def _dataset_key(self, cache_dir, tokenizer):
+        return (cache_dir, type(tokenizer).__name__)
+
+    def _get_or_load_datasets(self, name, model_params):
+        tokenizer = self._get_tokenizer(name, model_params)
+        cache_dir = model_params.get("_cache_dir", self._cache_pdf)
+        key = self._dataset_key(cache_dir, tokenizer)
+
+        if key not in self._datasets_cache:
+            self._datasets_cache[key] = self._load_datasets(name, model_params)
+        return self._datasets_cache[key]
+
     def run(self, grid):
         results = []
         for name, model_params in grid.items():
@@ -108,7 +122,14 @@ class ExperimentRunner:
         self._save_results(results)
 
     def _run_one(self, name, model_params):
-        datasets = self._load_datasets(name, model_params)
+        model_name = str(Path(self.result_path, f"row2region_GLAM_{name}"))
+        tmp_rez = Path(f"{model_name}_res.txt")
+
+        if Path(model_name).exists() and tmp_rez.exists():
+            with open(tmp_rez, "r") as f:
+                return json.load(f)
+
+        datasets = self._get_or_load_datasets(name, model_params)
         if datasets["train"] is not None:
             model_info = self._build_model(name, model_params)
             if "model_params" in model_info:
@@ -155,6 +176,12 @@ class ExperimentRunner:
     @staticmethod
     def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train, tokenizer):
         total = len(dataset)
+        cache_path = Path(cache_dir)
+
+        missing = [i for i in range(total) if not (cache_path / f"{dataset.pdf_names[i]}.json").exists()]
+        if not missing:
+            return
+
         workers = min(cpu_count(), 4)
 
         ctx = multiprocessing.get_context('spawn')
@@ -165,7 +192,7 @@ class ExperimentRunner:
                 initializer=_init_cache_worker,
                 initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train, tokenizer),
             ) as pool:
-                for _ in tqdm(pool.imap_unordered(_cache_one, range(total)), total=total):
+                for _ in tqdm(pool.imap_unordered(_cache_one, missing), total=len(missing)):
                     pass
         except ImportError:
             with ctx.Pool(
@@ -173,7 +200,7 @@ class ExperimentRunner:
                 initializer=_init_cache_worker,
                 initargs=(pdf_dir, coco_manager.coco_path, coco_manager.name_dataset, cache_dir, is_train, tokenizer),
             ) as pool:
-                pool.map(_cache_one, range(total))
+                pool.map(_cache_one, missing)
 
     def _build_model(self, name, model_params):
         if self._model_factory:
