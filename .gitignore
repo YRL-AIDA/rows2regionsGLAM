@@ -223,3 +223,5 @@ notebooks/*
 tmp_feature_*/
 *_res.txt
 tmp_diff_graphs_*/
+
+doclaynet_mini.zip

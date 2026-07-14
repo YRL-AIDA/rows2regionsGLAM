@@ -8,13 +8,19 @@ from rows2regionsGLAM.tokenizers import RowGLAMTokenizer as NoFontTokenizer
 if __name__ == '__main__':
     init()
     EPOCHS = int(os.environ.get("EPOCHS", "30"))
-    emb_font_tokenizer = EmbFontTokenizer()
+    emb_font_tokenizer_512 = EmbFontTokenizer(size=512)
+    emb_font_tokenizer_32 = EmbFontTokenizer(size=32)
+    emb_font_tokenizer_16 = EmbFontTokenizer(size=16)
     pdf_font_tokenizer = PDFFontTokenizer()
     no_font_tokenizer = NoFontTokenizer()
 
     def get_tokenizer(name, params):
-        if name.startswith("font_emb"):
-            return emb_font_tokenizer
+        if name.startswith("font_emb_16"):
+            return emb_font_tokenizer_16
+        elif name.startswith("font_emb_32"):
+            return emb_font_tokenizer_32
+        elif name.startswith("font_emb"):
+            return emb_font_tokenizer_512
         elif name.startswith("pdf_font"):
             return pdf_font_tokenizer
         elif name.startswith("no_font"):
@@ -27,6 +33,14 @@ if __name__ == '__main__':
         configs[f"font_emb_seed_{seed}"] = {
             **default_arch(input_dim=527, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
             "_cache_dir": "tmp_feature_font_emb",
+        }
+        configs[f"font_emb_16_seed_{seed}"] = {
+            **default_arch(input_dim=31, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
+            "_cache_dir": "tmp_feature_font_emb_16",
+        }
+        configs[f"font_emb_32_seed_{seed}"] = {
+            **default_arch(input_dim=47, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
+            "_cache_dir": "tmp_feature_font_emb_32",
         }
         configs[f"pdf_font_seed_{seed}"] = {
             **default_arch(input_dim=18, epochs=EPOCHS, early_stopping_patience=3, seed=seed),

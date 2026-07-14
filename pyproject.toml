@@ -7,7 +7,7 @@ name = "rows2regionsGLAM"
 version = "0.1.0"
 requires-python = ">=3.9"
 dependencies = [
-    "pagerlib @ git+https://github.com/YRL-AIDA/PageRLib.git@v0.0.8",
+    "pagerlib @ git+https://github.com/YRL-AIDA/PageRLib.git@v0.0.10",
     "pandas",
     "torchmetrics"
 ]
