@@ -16,27 +16,29 @@ class Trainer:
             raise Exception('Создайте и передайте логер "loger": Loger(path))')
         else:
             self.loger = conf['loger']
-            
+             
         if "train_param" not in conf.keys():
             raise Exception('Создайте и передайте параметры "train_param"')
         else:
             self.train_param = conf['train_param']
-            
+             
         if "model" not in conf.keys():
             raise Exception('Создайте и передайте модель "model"')
         else:
             self.model = conf['model']
-            
+             
         if "dataset" not in conf.keys():
             raise Exception('Создайте и передайте датасет "dataset"')
         else:
             self.dataset = conf['dataset']
 
+        self.val_dataset = conf.get('val_dataset', None)
+
         if "loss" not in conf.keys():
             raise Exception('Создайте и передайте loss function "loss"')
         else:
             self.loss = conf['loss']
-            
+             
         self.loger.time_log()
         self.loger("Create Trainer")
         self.device = torch.device(os.environ.get('DEVICE', 'cpu'))
@@ -64,6 +66,16 @@ class Trainer:
         batchs_train_indexs = [[train_indexs[(k * batch_size + i) % train_size] for i in range(batch_size)] for k in range(count_batchs)]
         batchs_val_indexs = [[val_indexs[(k * batch_size + i) % len(val_indexs)] for i in range(min(batch_size, len(val_indexs)))] for k in range(count_val_batch)] if val_indexs else []
         return batchs_train_indexs, batchs_val_indexs    
+
+    def _make_batches_from_dataset(self, dataset, batch_size):
+        """Делает батчи из всего датасета (без split)."""
+        N = len(dataset)
+        if N == 0:
+            return []
+        indexs = list(range(N))
+        batch_size = min(batch_size, N)
+        count_batchs = max(1, N // batch_size)
+        return [[indexs[(k * batch_size + i) % N] for i in range(batch_size)] for k in range(count_batchs)]
 
     def _step(self, model: torch.nn.Module, batch, optimizer, criterion, train=True):
         if train:
@@ -105,7 +117,9 @@ class Trainer:
         save_frequency = self.train_param.get('save_frequency', 5)
         restart_num = self.train_param.get('restart_num')
         patience = self.train_param.get('early_stopping_patience')
-        
+        seed = self.train_param.get("seed")
+        val_split = self.train_param.get("val_split", 0.1)
+
         start_epoch = 0
         if restart_num is not None:
             if patience:
@@ -123,13 +137,26 @@ class Trainer:
         best_val_loss = float('inf')
         patience_counter = 0
         start = time.time()
-        train_dataset, val_dataset = self._split_index_train_val(dataset, val_split=0.1, batch_size=batch_size, seed=self.train_param.get("seed"))
+
+        if self.val_dataset is not None:
+            # Внешняя валидация: train = 100% train_dataset, val = val_dataset
+            train_batches = self._make_batches_from_dataset(dataset, batch_size)
+            val_batches = self._make_batches_from_dataset(self.val_dataset, batch_size)
+            self.loger(f"External val: train={len(train_batches)} batches, val={len(val_batches)} batches")
+        elif val_split == 0.0:
+            # Без валидации
+            train_batches = self._make_batches_from_dataset(dataset, batch_size)
+            val_batches = []
+        else:
+            train_batches, val_batches = self._split_index_train_val(
+                dataset, val_split=val_split, batch_size=batch_size, seed=seed)
+
         for k in range(start_epoch, count_epochs):
             model.train()
             my_loss_list = []
             if k == start_epoch:
                 start = time.time()
-            for l, batch_indexs in enumerate(train_dataset):
+            for l, batch_indexs in enumerate(train_batches):
                 batch = [dataset[ind] for ind in batch_indexs]
                 batch_loss = self._step(model, batch, optimizer, criterion)
                 my_loss_list.append(batch_loss)
@@ -140,8 +167,9 @@ class Trainer:
 
             model.eval()
             my_loss_list = []
-            for l, batch_indexs in enumerate(val_dataset):
-                batch = [dataset[ind] for ind in batch_indexs]
+            val_ds = self.val_dataset if self.val_dataset is not None else dataset
+            for l, batch_indexs in enumerate(val_batches):
+                batch = [val_ds[ind] for ind in batch_indexs]
                 batch_loss = self._validation(model, batch, criterion)
                 my_loss_list.append(batch_loss)
                 print(f"Batch # {l+1} loss={my_loss_list[-1]:.4f}" + " "*40, end='\r')

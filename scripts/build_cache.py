@@ -164,12 +164,17 @@ def build(env_path, mode, verify_path):
         pdf_dir = _resolve(env_vars['DATASET_PATH'])
         coco_path = _resolve(env_vars['COCO_PATH'])
         name = env_vars.get('NAME_DATASET', 'publaynet')
+    elif mode == 'val':
+        pdf_dir = _resolve(env_vars.get('VAL_PATH', env_vars['DATASET_PATH']))
+        coco_path = _resolve(env_vars.get('VAL_COCO_PATH', env_vars['COCO_PATH']))
+        name = env_vars.get('NAME_VAL_DATASET', env_vars.get('NAME_DATASET', 'publaynet'))
     else:
         pdf_dir = _resolve(env_vars['TEST_PATH'])
         coco_path = _resolve(env_vars['TEST_COCO_PATH'])
         name = env_vars.get('NAME_TEST_DATASET', 'publaynet')
 
-    cache_dir = _resolve(env_vars['CASH_PDF_PATH'])
+    base_cache = _resolve(env_vars['CASH_PDF_PATH'])
+    cache_dir = os.path.join(base_cache, mode)
 
     loger = Loger()
     coco_manager = COCOManager(loger=loger, coco_path=coco_path, name_dataset=name)
@@ -237,7 +242,7 @@ def build(env_path, mode, verify_path):
             workers,
             initializer=_init_worker,
             initargs=(pdf_dir, shared_regions, shared_classes, name,
-                      cache_dir, mode == 'train', worker_status),
+                      cache_dir, mode != 'test', worker_status),
         ) as pool:
             for _ in pool.imap_unordered(_cache_one, range(total)):
                 pbar.update(1)
@@ -252,7 +257,7 @@ def build(env_path, mode, verify_path):
             workers,
             initializer=_init_worker,
             initargs=(pdf_dir, shared_regions, shared_classes, name,
-                      cache_dir, mode == 'train', worker_status),
+                      cache_dir, mode != 'test', worker_status),
         ) as pool:
             pool.map(_cache_one, range(total))
 
@@ -304,8 +309,8 @@ def build(env_path, mode, verify_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build dataset cache via GLAMDataset.init()')
-    parser.add_argument('mode', choices=['train', 'test'],
-                        help='train (with COCO labels) or test (parser only)')
+    parser.add_argument('mode', choices=['train', 'val', 'test'],
+                        help='train/val (with COCO labels) or test (parser only)')
     parser.add_argument('--env', default='debug',
                         help='Env shortcut or path to .env')
     parser.add_argument('--verify', default=None,

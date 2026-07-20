@@ -4,6 +4,8 @@ torch.sparse.check_sparse_tensor_invariants.disable()
 import json
 import numpy as np
 import os 
+import random
+import warnings
 from ...utils.coco_manager import COCOManager
 from ...utils.cacher import Cacher
 from ...utils.intersect_util import get_num_regions_of_rows
@@ -46,7 +48,8 @@ class GLAMDataset(Dataset):
         
         if "cache_dir" in conf.keys():
             self.cacher = Cacher(cache_dir=conf["cache_dir"], 
-                                 cache_fun=self.pdf2json_for_model)
+                                 cache_fun=self.pdf2json_for_model,
+                                 warn_nonempty=conf.get("warn_cache_nonempty", False))
         else:
             raise Exception('Укажите папку для cache ("cache_dir": path)')
         
@@ -55,12 +58,56 @@ class GLAMDataset(Dataset):
         else:
             raise Exception('Напишите функцию перевода pdf в torch_dict ("pred": pred(path_pdf))')
 
-        
+        # ── Новые параметры ──
+        self._cache_only = conf.get("cache_only", False)
+        self._data_fraction = conf.get("data_fraction", 1.0)
+        self._data_seed = conf.get("data_seed", None)
+        self._ram_cache_flag = conf.get("ram_cache", False)
+        self._ram_cache = None  # dict[str, dict] — заполняется при первом __getitem__
+
         self.device = torch.device(os.environ.get('DEVICE', 'cpu'))
         pdfs = [f for f in os.listdir(self.pdf_dir) if f.split('.')[-1] == 'pdf' and not os.path.isdir(f)]
         pdfs.sort()
-        self.count = len(pdfs)
-        self.pdf_names = [os.path.basename(pdf) for pdf in pdfs]
+        pdf_names = [os.path.basename(pdf) for pdf in pdfs]
+
+        # Фаза 1: cache_only — фильтрация по наличию кеша
+        if self._cache_only:
+            cache_dir = Path(conf["cache_dir"])
+            filtered = []
+            skipped = []
+            for name in pdf_names:
+                if (cache_dir / f"{name}.json").exists():
+                    filtered.append(name)
+                else:
+                    skipped.append(name)
+            if skipped:
+                msg = f"cache_only: пропущено {len(skipped)}/{len(pdf_names)} PDF без кеша"
+                warnings.warn(msg)
+                if self.loger:
+                    self.loger(msg)
+                    for s in skipped[:10]:
+                        self.loger(f"  SKIP: {s}")
+                    if len(skipped) > 10:
+                        self.loger(f"  ... и ещё {len(skipped) - 10}")
+            pdf_names = filtered
+
+        # Фаза 2: data_fraction — случайная подвыборка
+        if not (0.0 < self._data_fraction <= 1.0):
+            raise ValueError(f"data_fraction должен быть в (0.0, 1.0], получено {self._data_fraction}")
+        if self._data_fraction < 1.0:
+            N = len(pdf_names)
+            k = max(1, int(N * self._data_fraction))
+            if self._data_seed is not None:
+                rng = random.Random(self._data_seed)
+                subset = rng.sample(pdf_names, k)
+            else:
+                subset = random.sample(pdf_names, k)
+            if self.loger:
+                self.loger(f"data_fraction={self._data_fraction}: {k}/{N} PDF")
+            pdf_names = sorted(subset)
+
+        self.count = len(pdf_names)
+        self.pdf_names = pdf_names
         self.is_train = False
 
     def train(self):
@@ -190,6 +237,26 @@ class GLAMDataset(Dataset):
             return base_vec
         return torch.tensor([vec_class(c) for c in classes], dtype=torch.float32, device=self.device)
 
+    def _ensure_ram_cache(self):
+        """Однократная eager-загрузка всех JSON в self._ram_cache."""
+        if self._ram_cache is not None:
+            return
+        self._ram_cache = {}
+        N = len(self.pdf_names)
+        if self.loger:
+            self.loger(f"ram_cache: загрузка {N} JSON в память...")
+        for i, name in enumerate(self.pdf_names):
+            try:
+                self._ram_cache[name] = self.cacher(name)
+            except Exception as e:
+                print(f"ram_cache load error {name}: {e}")
+                self._ram_cache[name] = {}
+            if self.loger and (i + 1) % 5000 == 0:
+                self.loger(f"ram_cache: {i+1}/{N} ({100*(i+1)/N:.1f}%)")
+        if self.loger:
+            size_mb = sum(len(json.dumps(v)) for v in self._ram_cache.values()) / 1024 / 1024
+            self.loger(f"ram_cache: загружено {N} JSON ({size_mb:.1f} MB)")
+
     def __getitem__(self, idx):
         name_file = self.pdf_names[idx]
         
@@ -208,7 +275,11 @@ class GLAMDataset(Dataset):
                     "path": Path(self.pdf_dir, name_file)
                 }
         try:
-            data = self.cacher(name_file)
+            if self._ram_cache_flag:
+                self._ensure_ram_cache()
+                data = self._ram_cache.get(name_file, {})
+            else:
+                data = self.cacher(name_file)
         except Exception as e:
             print(e)
             print("cache error", name_file)
@@ -274,6 +345,9 @@ class GLAMDataset(Dataset):
         return f"""
             DATASET INFO:
             count row: {len(self)}
+            cache_only: {self._cache_only}
+            data_fraction: {self._data_fraction}
+            ram_cache: {self._ram_cache_flag} (loaded={self._ram_cache is not None})
             first: {first_keys}
             \t A:{_safe_shape(self[0], 'sp_A')}
             \t nodes_feature:{_safe_shape(self[0], 'X')}

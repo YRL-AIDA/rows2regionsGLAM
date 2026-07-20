@@ -99,6 +99,22 @@ class ExperimentRunner:
             name_dataset=self._test_dataset_name,
         )
 
+        # ── Опциональная внешняя валидация ──
+        self._val_dataset_path = os.environ.get("VAL_PATH")
+        self._val_dataset_coco = os.environ.get("VAL_COCO_PATH")
+        self._val_dataset_name = os.environ.get("NAME_VAL_DATASET", "publaynet")
+        self._has_external_val = bool(self._val_dataset_path and self._val_dataset_coco)
+
+        if self._has_external_val:
+            self._coco_manager_val = COCOManager(
+                loger=self.loger,
+                coco_path=self._val_dataset_coco,
+                name_dataset=self._val_dataset_name,
+            )
+            self.loger(f"External val: {self._val_dataset_path}")
+        else:
+            self._coco_manager_val = None
+
         self._datasets_cache = {}
 
     def _dataset_key(self, cache_dir, tokenizer):
@@ -133,7 +149,7 @@ class ExperimentRunner:
         if datasets["train"] is not None:
             model_info = self._build_model(name, model_params)
             if "model_params" in model_info:
-                self._train(model_info, datasets["train"], model_params)
+                self._train(model_info, datasets["train"], model_params, val_dataset=datasets.get("val"))
         else:
             model_info = self._build_model(name, model_params)
         result = self._test(name, model_info, datasets, model_params)
@@ -141,8 +157,17 @@ class ExperimentRunner:
 
     def _load_datasets(self, name, model_params):
         tokenizer = self._get_tokenizer(name, model_params)
-        cache_dir = model_params.get("_cache_dir", self._cache_pdf)
+        base_cache = model_params.get("_cache_dir", self._cache_pdf)
         test_only = model_params.get("_test_only", False)
+
+        train_cache = os.path.join(base_cache, "train")
+        test_cache = os.path.join(base_cache, "test")
+
+        # ── Мета-параметры для GLAMDataset ──
+        cache_only = model_params.get("_cache_only", False)
+        data_fraction = model_params.get("_data_fraction", 1.0)
+        data_seed = model_params.get("_data_seed", None)
+        ram_cache = model_params.get("_ram_cache", False)
 
         if not test_only:
             train_dataset = GLAMDataset(
@@ -150,28 +175,52 @@ class ExperimentRunner:
                 default_index=0,
                 pred=PredProcessor(loger=self.loger, coco_manager=self._coco_manager_train, tokenizer=tokenizer),
                 loger=self.loger,
-                cache_dir=cache_dir,
+                cache_dir=train_cache,
                 pdf_dir=self._train_dataset_path,
+                cache_only=cache_only,
+                data_fraction=data_fraction,
+                data_seed=data_seed,
+                ram_cache=ram_cache,
+                warn_cache_nonempty=False,
             )
             train_dataset.train()
             self._cache_dataset_parallel(train_dataset, self._train_dataset_path,
-                                         self._coco_manager_train, cache_dir, is_train=True, tokenizer=tokenizer)
+                                         self._coco_manager_train, train_cache, is_train=True, tokenizer=tokenizer)
         else:
             train_dataset = None
+
+        # Внешняя валидация
+        if self._has_external_val:
+            val_cache = os.path.join(base_cache, "val")
+            val_dataset = GLAMDataset(
+                coco_manager=self._coco_manager_val,
+                default_index=0,
+                pred=PredProcessor(loger=self.loger, coco_manager=self._coco_manager_val, tokenizer=tokenizer),
+                loger=self.loger,
+                cache_dir=val_cache,
+                pdf_dir=self._val_dataset_path,
+                warn_cache_nonempty=False,
+            )
+            val_dataset.train()
+            self._cache_dataset_parallel(val_dataset, self._val_dataset_path,
+                                         self._coco_manager_val, val_cache, is_train=True, tokenizer=tokenizer)
+        else:
+            val_dataset = None
 
         test_dataset = GLAMDataset(
             coco_manager=self._coco_manager_test,
             default_index=0,
             pred=PredProcessor(loger=self.loger, coco_manager=self._coco_manager_test, tokenizer=tokenizer),
             loger=self.loger,
-            cache_dir=cache_dir,
+            cache_dir=test_cache,
             pdf_dir=self._test_dataset_path,
+            warn_cache_nonempty=False,
         )
         test_dataset.train()
         self._cache_dataset_parallel(test_dataset, self._test_dataset_path,
-                                     self._coco_manager_test, cache_dir, is_train=True, tokenizer=tokenizer)
+                                     self._coco_manager_test, test_cache, is_train=True, tokenizer=tokenizer)
 
-        return {"train": train_dataset, "test": test_dataset}
+        return {"train": train_dataset, "val": val_dataset, "test": test_dataset}
 
     @staticmethod
     def _cache_dataset_parallel(dataset, pdf_dir, coco_manager, cache_dir, is_train, tokenizer):
@@ -204,7 +253,7 @@ class ExperimentRunner:
         model_name = str(Path(self.result_path, f"row2region_GLAM_{name}"))
         return {"model_name": model_name, "model_params": params}
 
-    def _train(self, model_info, train_dataset, model_params):
+    def _train(self, model_info, train_dataset, model_params, val_dataset=None):
         model_name = model_info["model_name"]
         params = copy.deepcopy(model_info["model_params"])
 
@@ -236,7 +285,8 @@ class ExperimentRunner:
         model, num_restart = get_model(params, model_name)
         params["restart_num"] = num_restart
         loss = get_loss(params["loss_params"])
-        trainer = Trainer(model=model, dataset=train_dataset, loss=loss, train_param=params, loger=self.loger)
+        trainer = Trainer(model=model, dataset=train_dataset, val_dataset=val_dataset,
+                          loss=loss, train_param=params, loger=self.loger)
         trainer.start_train()
         model = trainer.model
         save_model(model, model_name)

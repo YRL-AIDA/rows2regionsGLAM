@@ -22,7 +22,7 @@ class Cacher:
         
         if not self.cache_dir.exists():
             self.cache_dir.mkdir()
-        elif len(list(self.cache_dir.iterdir())) != 0:
+        elif conf.get("warn_nonempty", True) and len(list(self.cache_dir.iterdir())) != 0:
             warnings.warn("Кеш не пустой !!!", DeprecationWarning)
             
         if "cache_fun" in conf.keys():
