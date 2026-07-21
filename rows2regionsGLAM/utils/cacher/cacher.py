@@ -21,7 +21,7 @@ class Cacher:
             raise Exception('Укажите папку для cache ("cache_dir": path)')
         
         if not self.cache_dir.exists():
-            self.cache_dir.mkdir()
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
         elif conf.get("warn_nonempty", True) and len(list(self.cache_dir.iterdir())) != 0:
             warnings.warn("Кеш не пустой !!!", DeprecationWarning)
             
