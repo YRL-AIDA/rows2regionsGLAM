@@ -21,17 +21,9 @@ class FontRowGlAMTokenizer(BaseLineTokenizer):
         return "Font Tokenizer"
 
     def get_node_features(self, rows_json, pdf_img):
-        if len(rows_json) == 0:
-            return [[]]
-        rows_texts = [(r.get('text') or (r.get('data') or {}).get('text', '')) for r in rows_json]
-        dot_vec = np.array([[1.0 if dot in r else 0.0 for dot in (".", ",", ";", ":")] for r in rows_texts])
-
-        list_ind_vec = np.array([self.get_vec_list(r) for r in rows_texts])
-        super_vec = np.array([self.get_vec_supper(r) for r in rows_texts])
-        coord_vec = np.array([self.get_vec_coord(r_json) for r_json in rows_json])
-        heuristics_vec = np.array([self.get_vec_heuristics(r_json) for r_json in rows_json])
+        old_feature = np.array(super().get_node_features(rows_json, pdf_img))
         font_feature_vec = np.array([self._get_vec_font_safe(r_json, pdf_img) for r_json in rows_json])
-        nodes_feature = np.concat([coord_vec, dot_vec, super_vec, list_ind_vec, heuristics_vec, font_feature_vec], axis=1)
+        nodes_feature = np.concat([old_feature, font_feature_vec], axis=1)
         return nodes_feature.tolist()
 
     def _get_vec_font_safe(self, row, pdf_img):

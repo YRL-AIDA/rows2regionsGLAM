@@ -40,17 +40,29 @@ class RowGLAMTokenizer(BaseTokenizer):
     def get_node_features(self, rows_json, pdf_img):
         if len(rows_json) == 0:
             return [[]]
-        rows_texts = [(r.get('text') or (r.get('data') or {}).get('text', '')) for r in rows_json]
-        dot_vec = np.array([[1.0 if dot in r else 0.0 for dot in (".", ",", ";", ":")] for r in rows_texts])
+        page_h, page_w = pdf_img.shape[:2]
         
+        segs = [ImageSegment(dict_p_size=row_json['segment']) for row_json in rows_json]
+        page_x_min = min([seg.x_top_left for seg in segs])
+        page_y_min = min([seg.y_top_left for seg in segs])
+        page = [page_h, page_w, page_x_min, page_y_min]
+        rows_texts = [' '.join(w.get('data').get('text', '') for w in r.get('words', [])) for r in rows_json]
+        dot_vec = np.array([self.get_vec_end_char(r) for r in rows_texts])
         list_ind_vec = np.array([self.get_vec_list(r) for r in rows_texts])
         super_vec = np.array([self.get_vec_supper(r) for r in rows_texts])
-        coord_vec = np.array([self.get_vec_coord(r_json) for r_json in rows_json])
+        coord_vec = np.array([self.get_vec_coord(seg, page) for seg in segs])
         heuristics_vec = np.array([self.get_vec_heuristics(r_json) for r_json in rows_json])
         nodes_feature = np.concat([coord_vec,  dot_vec, super_vec, list_ind_vec, heuristics_vec], axis=1)
         return nodes_feature.tolist()
     
-
+    def get_vec_end_char(self, text):
+        dots = (".", ",", ";", ":", '?', '!')
+        text_ = text.lstrip()
+        if len(text_) == 0:
+            return [0 for _ in dots]
+        
+        return [1.0 if text_[-1] == dot else 0.0 for dot in dots ] 
+    
     def get_dict_vec(self):
         return {
             "x_top_left": [0],
@@ -59,10 +71,11 @@ class RowGLAMTokenizer(BaseTokenizer):
             "y_top_left":[3],
             "y_bottom_right": [4],
             "height" : [5],
-            "dot_vec": [6, 7, 8, 9],
-            "super_vec": [10, 11],
-            "list_ind_vec": [12],
-            "heuristics_vec": [13, 14]
+            "norm_geom": [6, 7, 8, 9],
+            "dot_vec": [10, 11, 12, 13, 14, 15],
+            "super_vec": [16],
+            "list_ind_vec": [17],
+            "heuristics_vec": [18, 19, 20]
         }
 
     def get_edge_features(self, A, rows_json, pdf_img):
@@ -100,22 +113,20 @@ class RowGLAMTokenizer(BaseTokenizer):
         }
     
     def get_vec_heuristics(self, row):
-        text = row.get('text') or (row.get('data') or {}).get('text', '')
+        text = ' '.join(w.get('data').get('text', '') for w in row.get('words', []))
         text_size = len(text)
         if text_size == 0:
-            return [0, 0]
+            return [0, 0, 0]
         seg = ImageSegment(dict_p_size=row['segment'])
         m = seg.width/seg.height
         digit_count = sum(char.isdigit() for char in text)
-        return [text_size/m, digit_count/text_size]
+        return [text_size/m, digit_count/text_size, np.log(1+len(text))]
 
     def get_vec_supper(self, row_text):
-        if row_text.isupper():
-            return [1, 0]
-        elif row_text and row_text[0].isupper():
-            return [0, 1]
-        else:
-            return [0, 0]
+        if len(row_text) == 0:
+            return [0]
+        isup = sum(1 for char in row_text if char.isupper())/len(row_text)
+        return [isup]
         
     def get_vec_list(self, row_text):
         patterns = [
@@ -146,13 +157,16 @@ class RowGLAMTokenizer(BaseTokenizer):
                 r'\b[A-Z]+-\d+\b'  # Код-номера: ABC-123
             ]
         flag = False
+        if len(row_text) < 2:
+            return [0]
         for pattern in patterns:
-            if bool(re.search(pattern, row_text, flags=re.IGNORECASE)):
+            if bool(re.search(pattern, row_text[:len(row_text)//2], flags=re.IGNORECASE)):
                 flag = True
                 break
         list_mark = 1 if flag else 0
         return [list_mark]
 
-    def get_vec_coord(self, row_json):
-        seg = ImageSegment(dict_p_size=row_json['segment'])
-        return [seg.x_top_left, seg.x_bottom_right, seg.width, seg.y_top_left, seg.y_bottom_right, seg.height]
+    def get_vec_coord(self, seg, page):
+        page_h, page_w, page_x_min, page_y_min = page 
+        return [seg.x_top_left, seg.x_bottom_right, seg.width, seg.y_top_left, seg.y_bottom_right, seg.height,
+                seg.y_top_left/page_h, seg.x_top_left/page_w, (seg.y_top_left-page_y_min)/page_h, (seg.x_top_left-page_x_min)/page_w]

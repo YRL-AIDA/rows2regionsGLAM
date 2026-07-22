@@ -30,24 +30,24 @@ if __name__ == '__main__':
 
     configs = {}
     for seed in range(3):
-        configs[f"font_emb_seed_{seed}"] = {
-            **default_arch(input_dim=527, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
-            "_cache_dir": "tmp_feature_font_emb",
-        }
-        configs[f"font_emb_16_seed_{seed}"] = {
-            **default_arch(input_dim=31, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
-            "_cache_dir": "tmp_feature_font_emb_16",
-        }
+        # configs[f"font_emb_seed_{seed}"] = {
+        #     **default_arch(input_dim=527, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
+        #     "_cache_dir": "tmp_feature_font_emb",
+        # }
+        # configs[f"font_emb_16_seed_{seed}"] = {
+        #     **default_arch(input_dim=31, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
+        #     "_cache_dir": "tmp_feature_font_emb_16",
+        # }
         configs[f"font_emb_32_seed_{seed}"] = {
-            **default_arch(input_dim=47, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
+            **default_arch(input_dim=21+32, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
             "_cache_dir": "tmp_feature_font_emb_32",
         }
         configs[f"pdf_font_seed_{seed}"] = {
-            **default_arch(input_dim=18, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
+            **default_arch(input_dim=21+3, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
             "_cache_dir": "tmp_feature_pdf_font",
         }
         configs[f"no_font_seed_{seed}"] = {
-            **default_arch(input_dim=15, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
+            **default_arch(input_dim=21, epochs=EPOCHS, early_stopping_patience=3, seed=seed),
             "_cache_dir": "tmp_feature_no_font",
         }
 
