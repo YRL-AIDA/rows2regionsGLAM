@@ -220,8 +220,7 @@ notebooks/*
 **/result/
 !**/result/results.csv
 
-tmp_feature_*/
+tmp_*/
 *_res.txt
-tmp_diff_graphs_*/
 
 doclaynet_mini.zip

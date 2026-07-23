@@ -117,13 +117,15 @@ class ExperimentRunner:
 
         self._datasets_cache = {}
 
-    def _dataset_key(self, cache_dir, tokenizer):
-        return (cache_dir, type(tokenizer).__name__)
+    def _dataset_key(self, cache_dir, tokenizer, model_params):
+        data_fraction = model_params.get("_data_fraction", 1.0)
+        data_seed = model_params.get("_data_seed", None)
+        return (cache_dir, type(tokenizer).__name__, data_fraction, data_seed)
 
     def _get_or_load_datasets(self, name, model_params):
         tokenizer = self._get_tokenizer(name, model_params)
         cache_dir = model_params.get("_cache_dir", self._cache_pdf)
-        key = self._dataset_key(cache_dir, tokenizer)
+        key = self._dataset_key(cache_dir, tokenizer, model_params)
 
         if key not in self._datasets_cache:
             self._datasets_cache[key] = self._load_datasets(name, model_params)
