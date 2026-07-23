@@ -8,6 +8,7 @@ ENV_TEMPLATES = {
     'debug': '.env.debug',
     'local': '.env.local',
     'server': '.env.server',
+    'serverML': '.env.serverML',
 }
 
 
