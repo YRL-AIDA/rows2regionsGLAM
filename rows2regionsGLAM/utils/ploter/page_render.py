@@ -19,7 +19,9 @@ COLORS_CLASS = [
     'lime',
     'teal',
 ]
-
+NAME2INT = {
+    'other':0, 'text': 1, 'title': 2, 'list': 3, 'table': 4, 'figure':5 
+}
 
 class PageRender:
     def __init__(self, id2name=None):
@@ -47,6 +49,8 @@ class PageRender:
         ax.imshow(img, extent=[0, page_w, page_h, 0])
 
         self._draw_rows(ax, rows)
+        print(true_categories, pred_categories)
+        pred_categories = [NAME2INT[p] for p in pred_categories]
         self._draw_true_regions(ax, true_regions, true_categories)
         self._draw_pred_regions(ax, pred_regions, pred_categories)
         self._draw_graph(ax, torch_dict, rows)
@@ -127,7 +131,7 @@ class PageRender:
                 [x0, x0, x1, x1, x0],
                 [y0, y1, y1, y0, y0],
                 color=color,
-                linewidth=1.5,
+                linewidth=1.0,
                 linestyle="--",
             )
             ax.text(x1 - 30, y1 - 4, name, color=color, fontsize=5, fontweight="bold")

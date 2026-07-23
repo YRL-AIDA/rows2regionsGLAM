@@ -1,0 +1,154 @@
+{
+  "node_block": {
+    "linear_pred": [
+      {
+        "in": 21,
+        "out": 256,
+        "activation": "gelu"
+      },
+      {
+        "in": 256,
+        "out": 128,
+        "activation": "gelu"
+      }
+    ],
+    "gnn": [
+      [
+        "tag",
+        {
+          "batch_norm": true,
+          "concat": true,
+          "in": 128,
+          "in_gnn": 256,
+          "out_gnn": 128,
+          "gnn_activation": "gelu",
+          "activation": "gelu",
+          "K": 3
+        }
+      ],
+      [
+        "tag",
+        {
+          "batch_norm": false,
+          "concat": true,
+          "in": 256,
+          "in_gnn": 256,
+          "out_gnn": 128,
+          "gnn_activation": "gelu",
+          "activation": "gelu",
+          "K": 3
+        }
+      ]
+    ]
+  },
+  "node_classifier_block": {
+    "linear_post": [
+      {
+        "in": 384,
+        "out": 256,
+        "activation": "gelu"
+      },
+      {
+        "in": 256,
+        "out": 128,
+        "activation": "gelu"
+      },
+      {
+        "in": 128,
+        "out": 6,
+        "activation": "none"
+      }
+    ]
+  },
+  "edge_classifier_block": {
+    "linear_post": [
+      {
+        "in": 302,
+        "out": 256,
+        "activation": "gelu"
+      },
+      {
+        "in": 256,
+        "out": 64,
+        "activation": "gelu"
+      },
+      {
+        "in": 64,
+        "out": 1,
+        "activation": "none"
+      }
+    ]
+  },
+  "epochs": 30,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "seg_k": 0.5,
+  "loss_params": {
+    "edge_coef": 0.8,
+    "node_coef": 0.19999999999999996
+  },
+  "post_node_block": {
+    "linear_pred": [
+      {
+        "in": 384,
+        "out": 256,
+        "activation": "gelu"
+      },
+      {
+        "in": 256,
+        "out": 256,
+        "activation": "gelu"
+      },
+      {
+        "in": 256,
+        "out": 128,
+        "activation": "gelu"
+      }
+    ],
+    "gnn": [
+      [
+        "tag",
+        {
+          "batch_norm": true,
+          "concat": true,
+          "in": 128,
+          "in_gnn": 256,
+          "out_gnn": 128,
+          "gnn_activation": "gelu",
+          "activation": "gelu",
+          "K": 3
+        }
+      ],
+      [
+        "tag",
+        {
+          "batch_norm": false,
+          "concat": true,
+          "in": 256,
+          "in_gnn": 256,
+          "out_gnn": 128,
+          "gnn_activation": "gelu",
+          "activation": "gelu",
+          "K": 3
+        }
+      ]
+    ],
+    "linear_post": [
+      {
+        "in": 384,
+        "out": 256,
+        "activation": "gelu"
+      },
+      {
+        "in": 256,
+        "out": 128,
+        "activation": "gelu"
+      },
+      {
+        "in": 128,
+        "out": 128,
+        "activation": "gelu"
+      }
+    ]
+  }
+}

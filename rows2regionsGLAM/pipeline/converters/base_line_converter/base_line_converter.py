@@ -46,7 +46,7 @@ class Rows2Regions(BaseConverter):
 
         for reg in graph_.get_related_graphs():
             indexes = [node.index-1 for node in reg.get_nodes()]
-            row_classes  = np.array([node_classes[i].detach().numpy() for i in indexes])
+            row_classes  = np.array([node_classes[i].detach().cpu().numpy() for i in indexes])
             lable = self.classes[np.argmax(row_classes.mean(axis=0) if row_classes.shape[0]>1 else row_classes[0] )]
             regions.append(Region(children=[rows_json[i] for i in indexes], data={'label': lable}))
         return regions
