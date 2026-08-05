@@ -19,7 +19,7 @@ from rows2regionsGLAM.datasetloaders.base_line_dataset import GLAMDataset
 from rows2regionsGLAM.utils.trainer import Trainer
 from rows2regionsGLAM.utils.tester import Tester
 from rows2regionsGLAM.utils.imbalance import calculate_imbalance
-from rows2regionsGLAM.tokenizers import RowGLAMTokenizer
+from rows2regionsGLAM.tokenizers.font_emb_tokenizer import RowGLAMTokenizer as EmbFontTokenizer
 from rows2regionsGLAM.pipeline import Pipeline
 from rows2regionsGLAM.models import get_loss, get_model, save_model
 
@@ -75,7 +75,7 @@ class ExperimentRunner:
         self._model_factory = model_factory
         self._tester_factory = tester_factory
 
-        default_tokenizer_factory = lambda name, params: RowGLAMTokenizer()
+        default_tokenizer_factory = lambda name, params:  EmbFontTokenizer(size=32)
         self._get_tokenizer = get_tokenizer or default_tokenizer_factory
 
         self._train_dataset_name = os.environ["NAME_DATASET"]
