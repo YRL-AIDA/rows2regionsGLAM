@@ -49,7 +49,7 @@ def default_arch(
     num_layers=2,
     has_post_node=True,
     has_lp=True,
-    input_dim=21,
+    input_dim=53,
     num_classes=6,
     edge_dim=4,
     hidden_dim=128,
