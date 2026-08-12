@@ -170,8 +170,8 @@ class Tester:
 
     def print_result(self, metrics):
         grid_cls, map_cls = self.get_results(metrics)
-        seg_str_map =f'{map_cls["name"]} (segmentation): {map_cls['segmentation']:.4f}'
-        cls_str_map =f'{map_cls["name"]} (with classification): {map_cls['all']:.4f}'
+        seg_str_map =f'{map_cls["name"]} (segmentation): {map_cls["segmentation"]:.4f}'
+        cls_str_map =f'{map_cls["name"]} (with classification): {map_cls["all"]:.4f}'
       
         print(seg_str_map)
         print(cls_str_map)

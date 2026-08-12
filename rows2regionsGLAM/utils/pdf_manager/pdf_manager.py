@@ -22,6 +22,9 @@ class PDFManager:
             conf['pdf_reader'] = "PDFMiner"
         if conf['pdf_reader'] == "PDFMiner":
             self.pdf_reader = FileInput()
+        elif conf['pdf_reader'] == "Paddle":
+            from .paddle_ocr_reader import PaddleOCRReader
+            self.pdf_reader = PaddleOCRReader()
         elif conf['pdf_reader'] == "PrecisionPDF":
             raise Exception('На данный момент PrecisionPDF не реализован')
         else:
@@ -36,7 +39,10 @@ class PDFManager:
     def get_rows(self, row):
         if row.data and 'font_vec' in row.data:
             row.data['font_vec'] = list(row.data['font_vec'])
-        
+        row.segment.x_top_left = row.segment.x_top_left 
+        row.segment.y_top_left = row.segment.y_top_left - 5 
+        row.segment.x_bottom_right = row.segment.x_bottom_right 
+        row.segment.y_bottom_right = row.segment.y_bottom_right + 5 
         return row.to_dict()
 
     def read_pdf(self, pdf_path):

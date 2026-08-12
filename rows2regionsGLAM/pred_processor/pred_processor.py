@@ -35,15 +35,16 @@ class PredProcessor:
         
 
     def __call__(self, path_pdf) -> Dict:
-        path_pdf = Path(path_pdf)
-        pdf_json, img = self.get_json_and_img(path_pdf)
-        torch_dict = self.tokenizer(pdf_json['rows'], img)
-        
-        return {
-            "pdf_json": pdf_json,
-            "img": img,
-            "torch_dict": torch_dict
-        }
-
-
+        try:
+            path_pdf = Path(path_pdf)
+            pdf_json, img = self.get_json_and_img(path_pdf)
+            torch_dict = self.tokenizer(pdf_json['rows'], img)
+            return {
+                "pdf_json": pdf_json,
+                "img": img,
+                "torch_dict": torch_dict
+            }
+        except Exception as e:
+            print(f"ERROR in PredProcessor: {e}")
+            raise
     

@@ -44,8 +44,8 @@ def collect_maps(log_dir: str) -> Dict[str, Dict[str, float]]:
 
 
 def print_map_table(table: Dict[str, Dict[str, float]]) -> None:
-
-    header = f"{'test\\train':<12} | {'PubLayNet':<10} | {'DocLayNet':<10}"
+    tt= 'test\\train'
+    header = f"{tt:<12} | {'PubLayNet':<10} | {'DocLayNet':<10}"
     sep = "-" * len(header)
 
     print(header)
