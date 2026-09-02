@@ -40,9 +40,9 @@ class PDFManager:
         if row.data and 'font_vec' in row.data:
             row.data['font_vec'] = list(row.data['font_vec'])
         row.segment.x_top_left = row.segment.x_top_left 
-        row.segment.y_top_left = row.segment.y_top_left - 5 
+        row.segment.y_top_left = row.segment.y_top_left
         row.segment.x_bottom_right = row.segment.x_bottom_right 
-        row.segment.y_bottom_right = row.segment.y_bottom_right + 5 
+        row.segment.y_bottom_right = row.segment.y_bottom_right
         return row.to_dict()
 
     def read_pdf(self, pdf_path):
