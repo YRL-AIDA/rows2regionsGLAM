@@ -103,3 +103,13 @@ runner.run({name: default_arch(**overrides) for ...})
 **Axes:** train ∈ {pub, doc}, test ∈ {pub, doc}
 
 **Run:** `python experiments/paper/p09_portability/start.py`
+
+### 15. best_restart — Stability of the p12 winner
+
+**Hypothesis:** The architecture that won the random search in `p12_arch_model`
+(`rand_09`: TAG, 3 layers, PostNode + LP, h1/h2 = 128/128, λ_e = 0.70) has the
+same or lower seed variance as `default_arch` and a higher mean mAP.
+
+**Run:** `bash run.sh paper/p15_best_restart --env server`
+
+Results: `results/paper/p15_best_restart/` (`compute_stats.py`, `statistics.csv`).
